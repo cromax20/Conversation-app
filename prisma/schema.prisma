@@ -1,0 +1,134 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ---- Auth.js (comptes, sessions, liens magiques) ----
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  createdAt     DateTime  @default(now())
+
+  // Abonnement Stripe
+  stripeCustomerId   String?   @unique
+  subscriptionId     String?
+  subscriptionStatus String?
+  currentPeriodEnd   DateTime?
+
+  // Série de jours de pratique d'affilée
+  streakDays      Int       @default(0)
+  bestStreak      Int       @default(0)
+  lastPracticeDay DateTime?
+
+  accounts      Account[]
+  sessions      Session[]
+  conversations Conversation[]
+  progress      LanguageProgress[]
+}
+
+model Account {
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([provider, providerAccountId])
+}
+
+model Session {
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@id([identifier, token])
+}
+
+// ---- Conversations ----
+
+model Conversation {
+  id           String   @id @default(cuid())
+  userId       String
+  title        String
+  language     String // code de langue, ex. "es", ou "custom"
+  languageName String // nom affiché, ex. « Kabyle » ou saisie libre
+  progressKey  String // clé de LanguageProgress
+  level        String // A1 … C2
+  mode         String   @default("practice") // "practice" | "exam"
+  examResult   Json?
+  nativeLang   String // langue de l'élève, ex. "français"
+  scene        String // titre de la scène ou « Votre situation »
+  context      String // description de la situation
+  character    Json // { name, age, city, job, trait, hobby }
+  systemPrompt String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages Message[]
+
+  @@index([userId, updatedAt])
+}
+
+model Message {
+  id             String   @id @default(cuid())
+  conversationId String
+  role           String // "user" | "assistant"
+  text           String
+  // Blocs de contenu bruts renvoyés par l'API Claude (réponses du personnage),
+  // renvoyés tels quels aux tours suivants.
+  content        Json?
+  createdAt      DateTime @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+}
+
+// ---- Progression façon jeu ----
+
+model LanguageProgress {
+  id           String   @id @default(cuid())
+  userId       String
+  key          String // code de langue, ou "custom:<nom normalisé>"
+  languageName String
+  level        String // niveau CECRL validé ou déclaré : A1 … C2
+  xp           Int      @default(0) // points dans le niveau actuel
+  totalXp      Int      @default(0)
+  examsTaken   Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, key])
+}
