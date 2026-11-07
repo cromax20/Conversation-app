@@ -151,7 +151,10 @@ test("la connexion par e-mail envoie un lien magique", async ({ page }) => {
 test("la langue du site se change à tout moment (y compris l'arabe, de droite à gauche)", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Parlez une nouvelle langue, pour de vrai.");
+  await expect(page).toHaveTitle("Alomundo · Allô, le monde t'écoute.");
+  await expect(page.locator(".brand")).toContainText("Alomundo");
   await page.getByLabel("Langue du site").selectOption("en");
+  await expect(page).toHaveTitle("Alomundo · Hello, the world is listening.");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Speak a new language, for real.");
   await expect(page.getByRole("link", { name: "Sign in" })).toBeVisible();
   await expect(page.getByLabel("Language or dialect")).toContainText("Japanese");

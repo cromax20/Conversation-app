@@ -361,3 +361,9 @@ body{background:
 .anim .lantern{animation:lantern 18s linear infinite}
 @keyframes lantern{from{transform:translateY(300px);opacity:0}10%{opacity:1}to{transform:translate(20px,-30px);opacity:.2}}
 .float:hover,.float:focus-visible{animation-play-state:paused}
+
+/* ---- Marque ---- */
+.brand{display:inline-flex;align-items:center;gap:8px;font-weight:400}
+.logo{width:30px;height:30px;border-radius:10px;display:grid;place-items:center;font-size:16px;background:linear-gradient(135deg,#4b2bd8,#ff5f8f)}
+.tagline{display:none;font:500 13px var(--body);color:var(--muted);margin-inline-start:4px}
+@media (min-width:760px){.tagline{display:inline}}

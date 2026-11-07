@@ -15,7 +15,7 @@ if (process.env.AUTH_GOOGLE_ID && process.env.AUTH_GOOGLE_SECRET) {
 // simplement affiché dans le terminal au lieu d'être envoyé.
 providers.push(
   Resend({
-    from: process.env.EMAIL_FROM ?? "Atelier <onboarding@resend.dev>",
+    from: process.env.EMAIL_FROM ?? "Alomundo <onboarding@resend.dev>",
     ...(process.env.AUTH_RESEND_KEY
       ? {}
       : {

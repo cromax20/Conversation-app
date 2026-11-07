@@ -2,10 +2,10 @@
 const plural = (n: number, one: string, many: string) => (n > 1 ? many : one);
 
 export const fr = {
-  meta: { title: "Atelier de personnages", description: "Pratiquez une langue en discutant avec des personnages, à l'écrit, à voix haute ou en appel vidéo." },
-  nav: { brand: "Atelier de personnages", conversations: "Mes conversations", path: "Mon parcours", subscription: "Abonnement", pricing: "Tarifs", login: "Connexion", logout: "Déconnexion", siteLanguage: "Langue du site" },
+  meta: { title: "Alomundo", tagline: "Allô, le monde t'écoute.", description: "Pratiquez une langue en discutant avec des personnages, à l'écrit, à voix haute ou en appel vidéo." },
+  nav: { brand: "Alomundo", conversations: "Mes conversations", path: "Mon parcours", subscription: "Abonnement", pricing: "Tarifs", login: "Connexion", logout: "Déconnexion", siteLanguage: "Langue du site" },
   home: {
-    title: "Atelier de personnages",
+    title: "Alomundo",
     lede: "Décrivez une situation, choisissez une langue, et discutez avec un personnage qui vous fait pratiquer, à l'écrit ou à voix haute.",
     contextTitle: "Dans quelle situation voulez-vous vous entraîner ?",
     contextHelp: "Écrivez votre propre situation en une phrase, ou choisissez-en une ci-dessous.",

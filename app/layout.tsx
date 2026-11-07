@@ -9,7 +9,7 @@ import "./globals.css";
 
 export async function generateMetadata(): Promise<Metadata> {
   const { t } = await getI18n();
-  return { title: t.meta.title, description: t.meta.description };
+  return { title: `${t.meta.title} · ${t.meta.tagline}`, description: t.meta.description, applicationName: "Alomundo" };
 }
 export const viewport: Viewport = { width: "device-width", initialScale: 1, viewportFit: "cover" };
 
@@ -27,7 +27,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <body>
         <I18nProvider locale={locale}>
           <header className="topbar">
-            <Link href="/" className="brand">{t.nav.brand}</Link>
+            <Link href="/" className="brand" aria-label={`${t.nav.brand} — ${t.meta.tagline}`}><span className="logo" aria-hidden="true">📞</span>{t.nav.brand}<span className="tagline">{t.meta.tagline}</span></Link>
             <nav className="nav" aria-label="Navigation">
               {session?.user ? (
                 <>

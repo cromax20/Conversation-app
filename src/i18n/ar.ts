@@ -5,10 +5,10 @@ const n3 = (n: number, one: string, two: string, few: string, many: string) =>
   n === 1 ? one : n === 2 ? two : n >= 3 && n <= 10 ? `${n} ${few}` : `${n} ${many}`;
 
 export const ar: Dict = {
-  meta: { title: "ورشة الشخصيات", description: "تدرّب على لغة بالحديث مع شخصيات، كتابةً أو بصوت عالٍ أو في مكالمة فيديو." },
-  nav: { brand: "ورشة الشخصيات", conversations: "محادثاتي", path: "مساري", subscription: "الاشتراك", pricing: "الأسعار", login: "تسجيل الدخول", logout: "تسجيل الخروج", siteLanguage: "لغة الموقع" },
+  meta: { title: "Alomundo", tagline: "ألو، العالم يسمعك.", description: "تدرّب على لغة بالحديث مع شخصيات، كتابةً أو بصوت عالٍ أو في مكالمة فيديو." },
+  nav: { brand: "Alomundo", conversations: "محادثاتي", path: "مساري", subscription: "الاشتراك", pricing: "الأسعار", login: "تسجيل الدخول", logout: "تسجيل الخروج", siteLanguage: "لغة الموقع" },
   home: {
-    title: "ورشة الشخصيات",
+    title: "Alomundo",
     lede: "صِف موقفًا، واختر لغة، وتحدّث مع شخصية تساعدك على التدرّب، كتابةً أو بصوت عالٍ.",
     contextTitle: "في أي موقف تريد أن تتدرّب؟",
     contextHelp: "اكتب موقفك الخاص في جملة واحدة، أو اختر واحدًا من القائمة.",

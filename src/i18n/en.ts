@@ -2,10 +2,10 @@ import type { Dict } from "./fr";
 const plural = (n: number, one: string, many: string) => (n === 1 ? one : many);
 
 export const en: Dict = {
-  meta: { title: "Character Workshop", description: "Practise a language by chatting with characters, in writing, out loud or on a video call." },
-  nav: { brand: "Character Workshop", conversations: "My conversations", path: "My path", subscription: "Subscription", pricing: "Pricing", login: "Sign in", logout: "Sign out", siteLanguage: "Site language" },
+  meta: { title: "Alomundo", tagline: "Hello, the world is listening.", description: "Practise a language by chatting with characters, in writing, out loud or on a video call." },
+  nav: { brand: "Alomundo", conversations: "My conversations", path: "My path", subscription: "Subscription", pricing: "Pricing", login: "Sign in", logout: "Sign out", siteLanguage: "Site language" },
   home: {
-    title: "Character Workshop",
+    title: "Alomundo",
     lede: "Describe a situation, pick a language, and chat with a character who helps you practise, in writing or out loud.",
     contextTitle: "What situation do you want to practise?",
     contextHelp: "Write your own situation in one sentence, or pick one below.",

@@ -2,10 +2,10 @@ import type { Dict } from "./fr";
 const plural = (n: number, one: string, many: string) => (n === 1 ? one : many);
 
 export const de: Dict = {
-  meta: { title: "Figurenwerkstatt", description: "Übe eine Sprache im Gespräch mit Figuren – schriftlich, laut oder im Videoanruf." },
-  nav: { brand: "Figurenwerkstatt", conversations: "Meine Gespräche", path: "Mein Weg", subscription: "Abo", pricing: "Preise", login: "Anmelden", logout: "Abmelden", siteLanguage: "Sprache der Seite" },
+  meta: { title: "Alomundo", tagline: "Hallo, die Welt hört dir zu.", description: "Übe eine Sprache im Gespräch mit Figuren – schriftlich, laut oder im Videoanruf." },
+  nav: { brand: "Alomundo", conversations: "Meine Gespräche", path: "Mein Weg", subscription: "Abo", pricing: "Preise", login: "Anmelden", logout: "Abmelden", siteLanguage: "Sprache der Seite" },
   home: {
-    title: "Figurenwerkstatt",
+    title: "Alomundo",
     lede: "Beschreibe eine Situation, wähle eine Sprache und unterhalte dich mit einer Figur, die dich üben lässt – schriftlich oder laut.",
     contextTitle: "In welcher Situation möchtest du üben?",
     contextHelp: "Schreib deine eigene Situation in einem Satz oder wähle unten eine aus.",

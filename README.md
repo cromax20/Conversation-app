@@ -1,4 +1,6 @@
-# Atelier de personnages
+# Alomundo
+
+**Allô, le monde t'écoute.** « Allô » est le mot qu'on dit en décrochant dans des dizaines de langues (allô, alô, aló, алло, alo, ألو, الو, a lô, halo) et « mundo » se comprend presque partout : Alomundo, c'est « Allô le monde ».
 
 Site pour pratiquer une langue en discutant avec des personnages joués par Claude, à l'écrit ou à voix haute.
 
