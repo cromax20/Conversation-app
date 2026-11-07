@@ -33,6 +33,7 @@ model User {
   sessions      Session[]
   conversations Conversation[]
   progress      LanguageProgress[]
+  usage         UsageEvent[]
 }
 
 model Account {
@@ -83,8 +84,10 @@ model Conversation {
   languageName String // nom affiché, ex. « Kabyle » ou saisie libre
   progressKey  String // clé de LanguageProgress
   level        String // A1 … C2
-  mode         String   @default("practice") // "practice" | "exam"
+  mode         String   @default("practice") // "practice" | "exam" | "call"
+  sceneIndex   Int? // scène prédéfinie (pour l'afficher traduite)
   examResult   Json?
+  phrases      Json? // phrases pour commencer (débutants), générées une fois
   nativeLang   String // langue de l'élève, ex. "français"
   scene        String // titre de la scène ou « Votre situation »
   context      String // description de la situation
@@ -122,6 +125,8 @@ model LanguageProgress {
   key          String // code de langue, ou "custom:<nom normalisé>"
   languageName String
   level        String // niveau CECRL validé ou déclaré : A1 … C2
+  startLevel   String   @default("A1") // niveau de départ choisi par l'élève
+  examsPassed  Int      @default(0)
   xp           Int      @default(0) // points dans le niveau actuel
   totalXp      Int      @default(0)
   examsTaken   Int      @default(0)
@@ -131,4 +136,16 @@ model LanguageProgress {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, key])
+}
+
+// Appels à Claude hors répliques (traductions, phrases utiles) : comptent dans la limite du jour.
+model UsageEvent {
+  id        String   @id @default(cuid())
+  userId    String
+  kind      String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
 }

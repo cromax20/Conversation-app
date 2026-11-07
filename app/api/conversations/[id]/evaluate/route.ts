@@ -40,7 +40,7 @@ export async function POST(_req: Request, ctx: { params: Promise<{ id: string }>
   await prisma.$transaction([
     prisma.conversation.update({ where: { id }, data: { examResult: result } }),
     ...(result.passed
-      ? [prisma.languageProgress.update({ where: { userId_key: { userId: user.id, key: conv.progressKey } }, data: { level: conv.level, xp: 0 } })]
+      ? [prisma.languageProgress.update({ where: { userId_key: { userId: user.id, key: conv.progressKey } }, data: { level: conv.level, xp: 0, examsPassed: { increment: 1 } } })]
       // Épreuve ratée : retour au début du 3e palier, il faut s'entraîner encore un peu.
       : [prisma.languageProgress.update({ where: { userId_key: { userId: user.id, key: conv.progressKey } }, data: { xp: XP_PER_PALIER * (PALIERS_PER_LEVEL - 1) } })]),
   ]);

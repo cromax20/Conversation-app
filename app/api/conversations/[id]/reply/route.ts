@@ -5,6 +5,7 @@ import { quotaFor } from "@/lib/plan";
 import { streamReply, ReplyError } from "@/lib/claude";
 import { jsonError, notFound, unauthorized } from "@/lib/http";
 import { awardPractice } from "@/lib/progress-server";
+import { splitExpression } from "@/lib/characters";
 
 export const maxDuration = 60;
 
@@ -59,12 +60,14 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
         if (result.kind === "refused") {
           send({ t: "error", code: "refused", userMessageId });
         } else {
+          // En appel vidéo, la réplique commence par une balise d'expression (« [sourire] … »).
+          const { expression, text: spoken } = conv.mode === "call" ? splitExpression(result.text) : { expression: null, text: result.text };
           const saved = await prisma.message.create({
-            data: { conversationId: id, role: "assistant", text: result.text, content: JSON.parse(JSON.stringify(result.content)) },
+            data: { conversationId: id, role: "assistant", text: spoken, content: JSON.parse(JSON.stringify(result.content)) },
           });
           await prisma.conversation.update({ where: { id }, data: { updatedAt: new Date() } });
-          const reward = text && conv.mode === "practice" ? await awardPractice(user.id, conv.progressKey, text) : null;
-          send({ t: "done", id: saved.id, text: result.text, userMessageId, remaining: quota.remaining - 1, limit: quota.limit, reward });
+          const reward = text && conv.mode !== "exam" ? await awardPractice(user.id, conv.progressKey, text) : null;
+          send({ t: "done", id: saved.id, text: spoken, expression, userMessageId, remaining: quota.remaining - 1, limit: quota.limit, reward });
         }
       } catch (e) {
         if (!req.signal.aborted) {

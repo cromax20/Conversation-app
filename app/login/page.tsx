@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { AuthError } from "next-auth";
 import { auth, signIn, googleEnabled } from "@/auth";
+import { getI18n } from "@/i18n/server";
 
 function safeCallback(v: string | undefined) {
   return v && v.startsWith("/") && !v.startsWith("//") ? v : "/";
@@ -8,6 +9,7 @@ function safeCallback(v: string | undefined) {
 
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ callbackUrl?: string; sent?: string; error?: string }> }) {
   const sp = await searchParams;
+  const { t } = await getI18n();
   const callbackUrl = safeCallback(sp.callbackUrl);
   const session = await auth();
   if (session?.user) redirect(callbackUrl);
@@ -15,8 +17,8 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   if (sp.sent) {
     return (
       <main className="wrap">
-        <h1>Vérifiez vos e-mails</h1>
-        <p className="lede">Un lien de connexion vient de vous être envoyé. Il est valable 24 heures.</p>
+        <h1>{t.login.sentTitle}</h1>
+        <p className="lede">{t.login.sentText}</p>
       </main>
     );
   }
@@ -38,23 +40,23 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   return (
     <main className="wrap" style={{ maxWidth: 440 }}>
       <header>
-        <h1>Connexion</h1>
-        <p className="lede">Un compte garde vos personnages et l'historique de vos conversations.</p>
+        <h1>{t.login.title}</h1>
+        <p className="lede">{t.login.lede}</p>
       </header>
-      {sp.error && <p className="banner" role="alert">La connexion n'a pas abouti. Vérifiez l'adresse et réessayez.</p>}
+      {sp.error && <p className="banner" role="alert">{t.login.error}</p>}
       <div className="card stack">
         {googleEnabled && (
           <>
-            <form action={googleSignIn}><button className="btn" style={{ width: "100%" }} type="submit">Continuer avec Google</button></form>
-            <div className="divider">ou</div>
+            <form action={googleSignIn}><button className="btn" style={{ width: "100%" }} type="submit">{t.login.google}</button></form>
+            <div className="divider">{t.login.or}</div>
           </>
         )}
         <form action={emailSignIn} className="stack">
           <label className="stack" style={{ gap: 4 }}>
-            <span className="label">Adresse e-mail</span>
-            <input type="email" name="email" required autoComplete="email" placeholder="vous@exemple.com" />
+            <span className="label">{t.login.email}</span>
+            <input type="email" name="email" required autoComplete="email" placeholder={t.login.emailPlaceholder} />
           </label>
-          <button className={googleEnabled ? "ghost" : "btn"} type="submit">Recevoir un lien de connexion</button>
+          <button className={googleEnabled ? "ghost" : "btn"} type="submit">{t.login.sendLink}</button>
         </form>
       </div>
     </main>

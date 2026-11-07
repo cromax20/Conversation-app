@@ -2,12 +2,19 @@
 
 Site pour pratiquer une langue en discutant avec des personnages joués par Claude, à l'écrit ou à voix haute.
 
+- **Langue du site au choix** : français, anglais, espagnol, portugais, arabe (de droite à gauche) et allemand. Le choix est mémorisé, sinon la langue du navigateur est utilisée.
 - **Comptes** : connexion par lien magique (e-mail) ou Google.
 - **Historique** : chaque conversation est enregistrée et peut être reprise.
-- **Langues** : plus de 130 langues et dialectes (darija, kabyle, créoles, wolof, alsacien, cantonais, quechua…). On peut aussi écrire **n'importe quelle langue ou dialecte**, et personnaliser le prénom, la ville et l'âge du personnage.
-- **Progression façon jeu** : des XP à chaque réponse, 3 paliers par niveau, une série de jours d'affilée, puis une **épreuve de passage** notée par Claude pour monter de niveau (A1 → C2).
+- **Langues** : 136 langues et dialectes (darija, kabyle, créoles, wolof, alsacien, cantonais, quechua…), ou **n'importe quelle langue ou dialecte** saisi librement. Prénom, ville et âge du personnage modifiables.
+- **Discussion libre** (par défaut) : on parle de ce qu'on veut, le personnage suit. Ou une mise en situation (café, médecin, entretien…), ou une situation écrite par l'élève.
+- **Coup de pouce pour débutants** : 8 phrases pour commencer selon la situation (traduction et prononciation), « Dites-le dans votre langue » (traduction vers la langue apprise), bouton « traduire » sous chaque réplique.
+- **Mode écrit** : pour les transports, sans son ni micro, réponses comprises (aussi pendant les appels).
+- **Parcours façon jeu mobile** : un chemin de cases (3 paliers par niveau, épreuve de passage notée par Claude, A1 → C2) sur un fond propre à chaque langue (paysage, couleurs, monuments, plats), autocollants à collectionner, série de jours.
+- **Appel vidéo façon FaceTime** : interlocuteur entièrement personnalisable (visage, coiffure, voix, paysage), expressions du visage selon la conversation, bouche animée sur la voix, sous-titres, caméra de l'élève en vignette. Inclus dans l'abonnement, ou **gratuit une fois le niveau B2 validé** par une épreuve (réglable avec `CALL_FREE_LEVEL`).
 - **Voix premium** (abonnés) : écouter chaque réplique et répondre en dictée.
-- **Paiement** : formule gratuite limitée (10 réponses/jour) et abonnement mensuel Stripe (300 réponses/jour + voix).
+- **Paiement** : formule gratuite limitée (10 réponses/jour) et abonnement mensuel Stripe (300 réponses/jour + voix + appels).
+
+Les visages et les paysages sont des illustrations animées (SVG), sans photos ni service vidéo externe.
 
 Technique : Next.js 16, Auth.js, Prisma + Postgres, API Claude (`@anthropic-ai/sdk`), voix OpenAI, Stripe.
 

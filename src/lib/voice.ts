@@ -8,7 +8,7 @@ const STT_MODEL = "gpt-4o-mini-transcribe";
 const STT_LANG_HINT = new Set(["en", "zh", "hi", "es", "ar", "fr", "bn", "pt", "ru", "id", "ur", "de", "ja", "mr", "vi", "te", "ha", "tr", "ta"]);
 
 // Voix stable par personnage (même prénom → même voix).
-const VOICES = ["alloy", "ash", "ballad", "coral", "echo", "sage", "shimmer", "verse"] as const;
+export const VOICES = ["alloy", "ash", "ballad", "coral", "echo", "sage", "shimmer", "verse"] as const;
 
 export function voiceFor(name: string): (typeof VOICES)[number] {
   let h = 0;
@@ -24,12 +24,12 @@ function getClient() {
 
 export const voiceEnabled = () => Boolean(process.env.OPENAI_API_KEY) || process.env.MOCK_AI === "1";
 
-export async function synthesize(opts: { text: string; characterName: string; languageFr: string; level: string }): Promise<ArrayBuffer> {
+export async function synthesize(opts: { text: string; characterName: string; languageFr: string; level: string; voice?: string }): Promise<ArrayBuffer> {
   if (process.env.MOCK_AI === "1") return new ArrayBuffer(0);
   const slow = opts.level === "A1" || opts.level === "A2";
   const res = await getClient().audio.speech.create({
     model: TTS_MODEL,
-    voice: voiceFor(opts.characterName),
+    voice: (opts.voice && (VOICES as readonly string[]).includes(opts.voice) ? opts.voice : voiceFor(opts.characterName)) as (typeof VOICES)[number],
     input: opts.text.slice(0, 4000),
     instructions: `Parle en ${opts.languageFr} avec l'accent et la prononciation locale authentiques, sur un ton naturel et chaleureux${slow ? ", lentement et en articulant bien, pour un apprenant débutant" : ""}. Les transcriptions phonétiques entre parenthèses peuvent être lues plus bas ou ignorées.`,
     response_format: "mp3",

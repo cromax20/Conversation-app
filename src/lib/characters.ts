@@ -204,7 +204,8 @@ export const LEVELS = {
 export type Level = keyof typeof LEVELS;
 export const LEVEL_LABELS: Record<Level, string> = { A1: "A1 · débutant", A2: "A2 · élémentaire", B1: "B1 · intermédiaire", B2: "B2 · avancé", C1: "C1 · autonome", C2: "C2 · maîtrise" };
 export const LEVEL_ORDER: Level[] = ["A1", "A2", "B1", "B2", "C1", "C2"];
-export const NATIVE_LANGS = ["français", "anglais", "néerlandais", "espagnol", "arabe"];
+// Langues de l'élève proposées (codes BCP 47). Le nom affiché vient de Intl.DisplayNames.
+export const NATIVE_CODES = ["fr", "en", "es", "pt", "ar", "de", "it", "nl", "tr", "pl", "ro", "ru", "uk", "zh", "ja", "ko", "hi", "vi", "fa", "sw", "wo", "ln", "ber", "ht"];
 export const AGES = [19, 23, 27, 31, 34, 38, 42, 47, 53, 58, 64, 71];
 export const MAX_CONTEXT_LENGTH = 300;
 
@@ -220,8 +221,9 @@ export type ConversationSetup = {
   level: Level;
   nativeLang: string;
   character: Character; // name / city peuvent être vides : le personnage les choisit
-  sceneIndex: number | null; // index dans SCENES, ou null si situation libre
+  sceneIndex: number | null; // index dans SCENES, ou null si situation libre / discussion libre
   context: string; // situation libre (vide si scène prédéfinie)
+  freeTalk?: boolean; // discussion libre : aucun scénario, on parle de tout
 };
 
 const pick = <T,>(a: readonly T[], rand: () => number = Math.random): T => a[Math.floor(rand() * a.length)];
@@ -271,9 +273,10 @@ export function isValidSetup(setup: ConversationSetup): boolean {
   );
 }
 
-export function describeScene(setup: Pick<ConversationSetup, "sceneIndex" | "context">): { title: string; description: string } {
+export function describeScene(setup: Pick<ConversationSetup, "sceneIndex" | "context" | "freeTalk">): { title: string; description: string } {
   const own = setup.context.trim();
   if (own) return { title: "Votre situation", description: own };
+  if (setup.freeTalk) return { title: "Discussion libre", description: "on parle de tout et de rien, au fil de la conversation" };
   const s = SCENES[setup.sceneIndex ?? 0];
   return { title: s[0], description: s[1] };
 }
@@ -293,19 +296,22 @@ export function buildSystemPrompt(setup: ConversationSetup): string {
   const nat = setup.nativeLang;
   const own = setup.context.trim();
   const scene = describeScene(setup);
+  const free = !own && setup.freeTalk;
   const ctx = own ? own : `${scene.title.toLowerCase()} — ${scene.description}`;
   const who = name.trim() ? `Tu es ${name.trim()}, ${age} ans` : `Tu es un personnage de ${age} ans dont tu choisis toi-même le prénom, typique de la région`;
   const where = city.trim() ? ` à ${city.trim()}` : ` dans une ville ou un village typique où l'on parle cette langue`;
   return `${who}, ${job}${where}. Tu es ${trait} et tu adores ${hobby}.
 ${languageLine(setup)} Niveau ${setup.level} : ${LEVELS[setup.level]}.
 L'élève parle ${nat} et veut s'entraîner à la conversation.
-Contexte : ${ctx}.
-Joue la scène de façon naturelle et réaliste. Si le contexte l'exige, adapte ton rôle (par exemple propriétaire, serveur ou collègue) tout en gardant ta personnalité.
+${free
+  ? `Pas de scénario : c'est une discussion libre et naturelle, comme entre deux personnes qui se parlent vraiment. L'élève peut parler de ce qu'il·elle veut : suis ses sujets, réagis sincèrement, partage aussi tes avis, tes souvenirs et ta vie, et laisse la conversation aller où elle va.`
+  : `Contexte : ${ctx}.
+Joue la scène de façon naturelle et réaliste. Si le contexte l'exige, adapte ton rôle (par exemple propriétaire, serveur ou collègue) tout en gardant ta personnalité.`}
 
 Règles :
-- Commence la scène toi-même avec une première réplique${name.trim() ? "" : " (présente-toi avec ton prénom)"}.
+- ${free ? "Ouvre la conversation simplement, par une salutation chaleureuse" : "Commence la scène toi-même avec une première réplique"}${name.trim() ? "" : " (présente-toi avec ton prénom)"}.
 - Réponds en 1 à 3 phrases, comme dans une vraie conversation.
-- Termine chaque réponse par une question pour relancer.
+- ${free ? "Relance la conversation quand elle s'essouffle, mais sans poser une question à chaque fois : réagis comme une vraie personne." : "Termine chaque réponse par une question pour relancer."}
 - Si l'élève fait une erreur, reformule correctement sa phrase dans ta réponse, sans faire de leçon.
 - Si l'écriture n'est pas latine, ajoute la transcription phonétique entre parenthèses.
 - Si l'élève écrit "help", explique brièvement en ${nat}, puis reprends.
@@ -322,3 +328,35 @@ export function conversationTitle(setup: ConversationSetup): string {
 
 /** Premier message envoyé à Claude pour qu'il ouvre la scène (jamais affiché). */
 export const KICKOFF = "(Début de la scène. Ouvre la conversation.)";
+
+// ---- Appel vidéo ----
+
+export const EXPRESSIONS = ["neutre", "sourire", "rire", "surpris", "pensif", "inquiet"] as const;
+export type Expression = (typeof EXPRESSIONS)[number];
+
+/** Sépare la balise d'expression du début d'une réplique : « [sourire] Bonjour ! ». */
+export function splitExpression(raw: string): { expression: Expression | null; text: string } {
+  const m = raw.match(/^\s*\[([^\]]{1,20})\]\s*/);
+  if (!m) return { expression: null, text: raw };
+  const tag = m[1].trim().toLowerCase() as Expression;
+  return { expression: EXPRESSIONS.includes(tag) ? tag : null, text: raw.slice(m[0].length) };
+}
+
+export function buildCallPrompt(opts: {
+  language: string; customLanguage?: string; level: Level; nativeLang: string;
+  name: string; age: number; place: string; topic: string;
+}): string {
+  const where = opts.place.trim() ? ` qui vit à ${opts.place.trim()}` : "";
+  const topic = opts.topic.trim() ? `L'élève aimerait parler de : ${opts.topic.trim()}.` : "Parle de la vie de tous les jours, de ta région et de ce que l'élève a envie de raconter.";
+  return `Tu es ${opts.name.trim() || "un personnage qui choisit lui-même un prénom typique de sa région"}, ${opts.age} ans${where}. Tu es en appel vidéo avec un·e élève qui apprend ta langue, comme un appel FaceTime entre amis.
+${languageLine(opts)} Niveau ${opts.level} : ${LEVELS[opts.level]}.
+L'élève parle ${opts.nativeLang}. ${topic}
+
+Règles de l'appel :
+- Commence CHAQUE réplique par une balise d'expression entre crochets, choisie parmi : [neutre] [sourire] [rire] [surpris] [pensif] [inquiet]. Exemple : « [sourire] … ». Choisis celle qui correspond à ton émotion.
+- Tes répliques sont parlées : 1 ou 2 phrases courtes et naturelles, sans emoji, sans liste, sans mise en forme, sans transcription phonétique.
+- Décroche toi-même avec une salutation chaleureuse et une question.
+- Termine presque toujours par une question pour relancer.
+- Si l'élève fait une erreur, reprends naturellement la bonne forme dans ta réponse, sans faire de leçon.
+- Si l'élève écrit "help", aide-le en une phrase en ${opts.nativeLang}, puis reprends dans ta langue.`;
+}

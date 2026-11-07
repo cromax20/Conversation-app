@@ -21,9 +21,12 @@ export function startOfUtcDay(now = new Date()): Date {
 
 /** Nombre de réponses du personnage (= appels à Claude) consommées aujourd'hui (UTC). */
 export async function repliesUsedToday(userId: string, now = new Date()): Promise<number> {
-  return prisma.message.count({
-    where: { role: "assistant", createdAt: { gte: startOfUtcDay(now) }, conversation: { userId } },
-  });
+  const since = startOfUtcDay(now);
+  const [replies, extra] = await Promise.all([
+    prisma.message.count({ where: { role: "assistant", createdAt: { gte: since }, conversation: { userId } } }),
+    prisma.usageEvent.count({ where: { userId, createdAt: { gte: since } } }),
+  ]);
+  return replies + extra;
 }
 
 export async function quotaFor(userId: string, user: PlanUser) {

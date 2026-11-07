@@ -8,6 +8,7 @@ test("un visiteur voit le générateur et doit se connecter pour discuter", asyn
   await page.goto("/");
   await expect(page.getByRole("heading", { level: 1, name: "Atelier de personnages" })).toBeVisible();
   await expect(page.locator(".who")).toContainText("ans");
+  await expect(page.getByRole("button", { name: "💬 Discussion libre" })).toHaveAttribute("aria-pressed", "true");
   await page.getByRole("button", { name: "Se connecter pour commencer" }).click();
   await expect(page).toHaveURL(/\/login/);
   await expect(page.getByRole("button", { name: "Recevoir un lien de connexion" })).toBeVisible();
@@ -38,9 +39,9 @@ test("conversation complète : ouverture, réponse, XP, historique", async ({ pa
   await expect(page.locator(".msg")).toHaveCount(3);
   await page.goto("/conversations");
   await expect(page.getByRole("link", { name: /Kabyle/ })).toBeVisible();
-  await page.goto("/progression");
-  await expect(page.getByTestId("progress-card")).toContainText("Kabyle");
-  await expect(page.getByTestId("progress-card")).toContainText("Palier 1/3");
+  await page.goto("/parcours");
+  await expect(page.getByTestId("path")).toContainText("Kabyle");
+  await expect(page.locator('[data-state="current"]')).toContainText("A2 · Palier 1");
 });
 
 test("langue libre et personnage personnalisé", async ({ page, context }) => {
@@ -91,7 +92,7 @@ test("un abonné a la voix ; l'épreuve de passage fait monter de niveau", async
 
   // Les 3 paliers sont faits : l'épreuve est débloquée.
   await db.languageProgress.update({ where: { userId_key: { userId: user.id, key: "es" } }, data: { xp: 450 } });
-  await page.goto("/progression");
+  await page.goto("/parcours?lang=es");
   await page.getByRole("button", { name: "Passer l'épreuve A2" }).click();
   await expect(page.getByRole("heading", { name: "Épreuve de passage A2" })).toBeVisible();
   await expect(page.locator(".msg.ai").first()).toBeVisible();
@@ -102,9 +103,11 @@ test("un abonné a la voix ; l'épreuve de passage fait monter de niveau", async
   }
   await page.getByRole("button", { name: "Terminer l'épreuve" }).click();
   await expect(page.getByTestId("exam-result")).toContainText("Épreuve réussie");
-  await page.goto("/progression");
-  await expect(page.getByTestId("progress-card")).toContainText("A2");
-  await expect(page.getByTestId("progress-card")).toContainText("Palier 1/3");
+  await page.goto("/parcours?lang=es");
+  await expect(page.locator(".path-head")).toContainText("A2");
+  await expect(page.locator(".path-head")).toContainText("Palier 1/3");
+  const p = await db.languageProgress.findUniqueOrThrow({ where: { userId_key: { userId: user.id, key: "es" } } });
+  expect(p.examsPassed).toBe(1);
 });
 
 test("le webhook Stripe active et résilie l'abonnement", async ({ request }) => {
@@ -139,4 +142,155 @@ test("la connexion par e-mail envoie un lien magique", async ({ page }) => {
   await page.getByLabel("Adresse e-mail").fill(`magic-${Date.now()}@exemple.test`);
   await page.getByRole("button", { name: "Recevoir un lien de connexion" }).click();
   await expect(page.getByRole("heading", { name: "Vérifiez vos e-mails" })).toBeVisible();
+});
+
+test("la langue du site se change à tout moment (y compris l'arabe, de droite à gauche)", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Atelier de personnages");
+  await page.getByLabel("Langue du site").selectOption("en");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Character Workshop");
+  await expect(page.getByRole("link", { name: "Sign in" })).toBeVisible();
+  await expect(page.getByLabel("Language or dialect")).toContainText("Japanese");
+  await page.getByLabel("Site language").selectOption("ar");
+  await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("ورشة الشخصيات");
+  await page.reload();
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("ورشة الشخصيات");
+  await page.getByLabel("لغة الموقع").selectOption("fr");
+  await expect(page.locator("html")).toHaveAttribute("dir", "ltr");
+});
+
+test("parcours : fond et autocollants propres à la langue, appel verrouillé avant B2", async ({ page, context }) => {
+  const user = await signIn(context);
+  await db.languageProgress.create({ data: { userId: user.id, key: "es", languageName: "Espagnol", level: "A2", startLevel: "A1", xp: 200 } });
+  await page.goto("/parcours");
+  await expect(page.getByTestId("path")).toContainText("Espagnol");
+  await expect(page.locator(".stickers [title='Paella']")).toBeAttached();
+  await expect(page.locator(".node.done").first()).toContainText("Sagrada Família");
+  await expect(page.locator('.node-call')).toHaveAttribute("data-state", "locked");
+  await page.goto("/appel/nouveau?key=es");
+  await expect(page.getByRole("heading", { name: /Appel vidéo verrouillé/ })).toBeVisible();
+  expect((await page.request.post("/api/calls", { data: { key: "es", name: "x", age: 30, place: "", topic: "", avatar: {} } })).status()).toBe(400);
+});
+
+test("appel vidéo gratuit au niveau B2 validé : personnalisation, expressions, raccrocher", async ({ page, context }) => {
+  const user = await signIn(context);
+  await db.languageProgress.create({ data: { userId: user.id, key: "es", languageName: "Espagnol", level: "B2", startLevel: "A2", xp: 0, examsPassed: 3 } });
+  await page.goto("/parcours");
+  await expect(page.locator(".node-call")).toHaveAttribute("data-state", "done");
+  await page.getByRole("link", { name: "Lancer un appel vidéo" }).click();
+  await expect(page.getByRole("heading", { name: "Créer votre interlocuteur" })).toBeVisible();
+  await page.getByLabel("Prénom").fill("Carmen");
+  await page.getByLabel("Coiffure").selectOption("headscarf");
+  await page.getByLabel("Lunettes").selectOption("true");
+  await page.getByLabel("Paysage").selectOption("sea");
+  await page.getByRole("button", { name: /Appeler/ }).click();
+
+  await expect(page).toHaveURL(/\/appel\/c/);
+  const room = page.getByTestId("callroom");
+  await page.getByRole("button", { name: "Appeler" }).click();
+  await expect(page.getByTestId("subtitle")).toContainText("Bonjour !");
+  await expect(page.getByTestId("subtitle")).not.toContainText("[sourire]");
+  await expect(room).toHaveAttribute("data-status", "idle", { timeout: 15000 });
+  await page.getByRole("button", { name: "Écrire plutôt" }).click();
+  await page.getByPlaceholder("Votre réponse…").fill("Hola Carmen, ¿qué tal?");
+  await page.getByRole("button", { name: "Envoyer" }).click();
+  await expect(page.getByTestId("subtitle")).toContainText("Réponse simulée");
+  await expect(room).toHaveAttribute("data-expression", "rire");
+  await expect(room).toHaveAttribute("data-status", "idle", { timeout: 15000 });
+  await page.getByRole("button", { name: "Raccrocher" }).click();
+  await expect(page.getByText(/Appel terminé/)).toBeVisible();
+
+  const conv = await db.conversation.findFirstOrThrow({ where: { userId: user.id, mode: "call" }, include: { messages: { orderBy: { createdAt: "asc" } } } });
+  expect((conv.character as { avatar: { hairStyle: string; glasses: boolean } }).avatar).toMatchObject({ hairStyle: "headscarf", glasses: true });
+  expect(conv.messages.map((m) => m.text)[0]).toBe("Bonjour ! Comment puis-je vous aider ?");
+  // La voix de l'appel est autorisée sans abonnement une fois débloquée.
+  expect((await page.request.post("/api/voice/speak", { data: { messageId: conv.messages[0].id } })).status()).toBe(200);
+});
+
+test("un abonné accède à l'appel dès le début du parcours", async ({ page, context }) => {
+  const user = await signIn(context, { pro: true });
+  await db.languageProgress.create({ data: { userId: user.id, key: "ja", languageName: "Japonais", level: "A1", startLevel: "A1" } });
+  await page.goto("/parcours");
+  await page.locator(".callbanner").click();
+  await expect(page.getByRole("heading", { name: "Créer votre interlocuteur" })).toBeVisible();
+});
+
+test("discussion libre par défaut : pas de scénario", async ({ page, context }) => {
+  const user = await signIn(context);
+  await page.goto("/");
+  await page.getByRole("button", { name: "Commencer la conversation" }).click();
+  await expect(page).toHaveURL(/\/c\//);
+  await expect(page.locator(".scene")).toContainText("Discussion libre");
+  const conv = await db.conversation.findFirstOrThrow({ where: { userId: user.id } });
+  expect(conv.scene).toBe("free");
+  expect(conv.systemPrompt).toContain("discussion libre et naturelle");
+});
+
+test("coup de pouce débutant : phrases pour commencer et traductions", async ({ page, context }) => {
+  const user = await signIn(context);
+  await page.goto("/?lang=ja");
+  await page.getByLabel("Niveau").selectOption("A1");
+  await page.getByRole("button", { name: "Au restaurant" }).click();
+  await page.getByRole("button", { name: "Commencer la conversation" }).click();
+  await expect(page.locator(".msg.ai").first()).toBeVisible();
+  await expect(page.getByTestId("remaining")).toContainText("3 réponses restantes");
+
+  // Panneau ouvert d'office en A1, avec 8 phrases.
+  await expect(page.locator(".phrases li")).toHaveCount(8);
+  await expect(page.locator(".phrases li").first()).toContainText("fra-sé ou-til");
+  await page.locator(".phrases button").first().click();
+  await expect(page.getByPlaceholder("Votre réponse…")).toHaveValue("Frase útil 1");
+  await expect(page.getByTestId("remaining")).toContainText("3 réponses restantes"); // les phrases ne coûtent rien
+
+  // Dire une phrase dans sa langue → traduite dans la langue apprise.
+  await page.getByLabel("Dites-le dans votre langue").fill("Je voudrais un thé, s'il vous plaît");
+  await page.getByRole("button", { name: "Traduire", exact: true }).click();
+  await expect(page.getByTestId("translation")).toContainText("Je voudrais un thé");
+  await expect(page.getByTestId("translation")).toContainText("pro-non-cia-tion");
+  await page.getByRole("button", { name: "Utiliser" }).click();
+  await expect(page.getByPlaceholder("Votre réponse…")).toHaveValue(/Frase útil 1 \[Japonais\] Je voudrais un thé/);
+  await expect(page.getByTestId("remaining")).toContainText("2 réponses restantes");
+
+  // Traduire une réplique du personnage.
+  await page.getByRole("button", { name: "🌐 traduire" }).first().click();
+  await expect(page.getByTestId("line-translation")).toContainText("[traduction] Bonjour");
+  const conv = await db.conversation.findFirstOrThrow({ where: { userId: user.id } });
+  expect(Array.isArray(conv.phrases)).toBe(true);
+});
+
+test("pas de coup de pouce pendant une épreuve", async ({ page, context }) => {
+  const user = await signIn(context);
+  await db.languageProgress.create({ data: { userId: user.id, key: "de", languageName: "Allemand", level: "A1", startLevel: "A1", xp: 450 } });
+  await page.goto("/parcours?lang=de");
+  await page.getByRole("button", { name: "Passer l'épreuve A2" }).click();
+  await expect(page.locator(".msg.ai").first()).toBeVisible();
+  await expect(page.getByTestId("assist")).toHaveCount(0);
+  const id = page.url().split("/c/")[1];
+  expect((await page.request.post(`/api/conversations/${id}/translate`, { data: { text: "hallo", direction: "toNative" } })).status()).toBe(404);
+});
+
+test("mode écrit : pas de micro ni de son, l'appel se fait par écrit", async ({ page, context }) => {
+  const user = await signIn(context, { pro: true });
+  await page.goto("/");
+  await page.getByLabel("✍️ À l'écrit seulement").check();
+  await page.getByRole("button", { name: "Commencer la conversation" }).click();
+  await expect(page.locator(".msg.ai").first()).toBeVisible();
+  await expect(page.getByRole("button", { name: "Dicter votre réponse" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Écouter cette réplique" })).toHaveCount(0);
+  await page.getByLabel("✍️ À l'écrit seulement").uncheck();
+  await expect(page.getByRole("button", { name: "Dicter votre réponse" })).toBeVisible();
+  await page.getByLabel("✍️ À l'écrit seulement").check();
+
+  const progress = await db.languageProgress.findFirstOrThrow({ where: { userId: user.id } });
+  await page.goto(`/appel/nouveau?key=${progress.key}`);
+  await page.getByRole("button", { name: /Appeler/ }).click();
+  await page.getByRole("button", { name: "Appeler" }).click();
+  await expect(page.getByTestId("subtitle")).toContainText("Bonjour !");
+  await expect(page.getByRole("button", { name: "Appuyez pour parler" })).toHaveCount(0);
+  await expect(page.getByPlaceholder("Votre réponse…")).toBeVisible(); // saisie ouverte d'office
+  await expect(page.getByTestId("callroom")).toHaveAttribute("data-status", "idle", { timeout: 15000 });
+  await page.getByPlaceholder("Votre réponse…").fill("Hello");
+  await page.getByRole("button", { name: "Envoyer" }).click();
+  await expect(page.getByTestId("subtitle")).toContainText("Réponse simulée");
 });

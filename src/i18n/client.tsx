@@ -1,0 +1,15 @@
+"use client";
+
+import { createContext, useContext } from "react";
+import { getDict, type Locale } from "./index";
+
+const Ctx = createContext<Locale>("fr");
+
+export function I18nProvider({ locale, children }: { locale: Locale; children: React.ReactNode }) {
+  return <Ctx.Provider value={locale}>{children}</Ctx.Provider>;
+}
+
+export function useI18n() {
+  const locale = useContext(Ctx);
+  return { locale, t: getDict(locale) };
+}
