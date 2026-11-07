@@ -24,6 +24,16 @@ model User {
   subscriptionStatus String?
   plan               String? // "essential" | "plus" | "premium" (déduit du prix Stripe)
   hadTrial           Boolean   @default(false)
+  billingInterval    String? // "month" | "year"
+
+  // Croissance : parrainage, e-mails, langue
+  referralCode     String?   @unique
+  referredBy       String? // referralCode du parrain
+  referralRewarded Boolean   @default(false) // le parrain a déjà été récompensé pour ce filleul
+  referralCredits  Int       @default(0) // mois offerts gagnés en parrainant
+  emailOptOut      Boolean   @default(false)
+  lastEmailAt      DateTime?
+  locale           String?
   currentPeriodEnd   DateTime?
 
   // Série de jours de pratique d'affilée
@@ -37,6 +47,7 @@ model User {
   progress      LanguageProgress[]
   usage         UsageEvent[]
   decks         Deck[]
+  aiUsage       AiUsage[]
 }
 
 model Account {
@@ -182,4 +193,23 @@ model CardReview {
   deck Deck @relation(fields: [deckId], references: [id], onDelete: Cascade)
 
   @@unique([deckId, index])
+}
+
+// Coût réel de chaque appel à l'IA (Claude, voix), pour le tableau de bord et le budget mensuel.
+model AiUsage {
+  id           String   @id @default(cuid())
+  userId       String?
+  tier         String // formule de l'utilisateur au moment de l'appel
+  kind         String // reply | exam | translate | phrases | deck | tts | stt
+  model        String
+  inputTokens  Int      @default(0)
+  outputTokens Int      @default(0)
+  cacheRead    Int      @default(0)
+  cacheWrite   Int      @default(0)
+  costMicros   Int // coût en millionièmes de dollar
+  createdAt    DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
 }

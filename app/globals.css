@@ -389,3 +389,17 @@ body{background:
 .tier-cta{display:grid;margin-top:8px}
 .tier-cta .btn,.tier-cta .ghost{text-align:center}
 .call-left{color:#ffd36b}
+.table{width:100%;border-collapse:collapse;font-size:15px}
+.table th,.table td{text-align:start;padding:8px 6px;border-bottom:1px solid var(--line)}
+.table th{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+.admin .price{font-size:26px}
+
+/* ---- Croissance ---- */
+.offerbar{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:8px 14px;padding:8px 16px;font-size:14px;color:#fff;
+  background:linear-gradient(90deg,#ff7a59,#ff3d81,#9a37e8);text-align:center}
+.offerbar-cta{color:#fff;font-weight:700;background:rgba(255,255,255,.2);border-radius:999px;padding:3px 12px;text-decoration:none}
+.offer-card{display:grid;gap:4px;padding:16px;border-radius:16px;color:#fff;background:linear-gradient(120deg,#4b2bd8,#ff5f8f)}
+.was{font-size:14px;color:var(--stamp);font-weight:600}
+.upgrade{align-self:stretch;display:flex;gap:12px;align-items:flex-start;padding:14px;border-radius:16px;border:1px solid transparent;
+  background:linear-gradient(var(--card),var(--card)) padding-box,linear-gradient(135deg,#4b2bd8,#ff5f8f) border-box}
+.upgrade-icon{font-size:28px}

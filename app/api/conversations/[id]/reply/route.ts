@@ -7,6 +7,7 @@ import { jsonError, notFound, unauthorized } from "@/lib/http";
 import { awardPractice } from "@/lib/progress-server";
 import { splitExpression } from "@/lib/characters";
 import { freeCallActive } from "@/lib/calls";
+import { budgetBlocks, recordUsage } from "@/lib/costs";
 
 export const maxDuration = 60;
 
@@ -33,6 +34,8 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   }
 
   if (conv.examResult) return jsonError(409, "exam_finished", "Cette épreuve est terminée.");
+
+  if (await budgetBlocks(quota.tier)) return jsonError(503, "budget_paused", "Trop de demande pour le moment. Réessayez plus tard.");
 
   // Appel gratuit hebdomadaire : fermé une fois sa durée écoulée.
   if (conv.mode === "call" && !quota.features.calls && !freeCallActive(conv)) {
@@ -64,6 +67,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
           onText: (delta) => send({ t: "delta", text: delta }),
           signal: req.signal,
         });
+        void recordUsage({ userId: user.id, tier: quota.tier, kind: "reply", model: quota.features.model, usage: result.usage });
         if (result.kind === "refused") {
           send({ t: "error", code: "refused", userMessageId });
         } else {

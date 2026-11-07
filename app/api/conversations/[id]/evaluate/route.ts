@@ -3,6 +3,8 @@ import { currentUser } from "@/lib/session";
 import { jsonError, notFound, unauthorized } from "@/lib/http";
 import { evaluateExam, ReplyError } from "@/lib/claude";
 import { LEVELS, type Level } from "@/lib/characters";
+import { recordUsage } from "@/lib/costs";
+import { tierOf } from "@/lib/plan";
 import { MIN_EXAM_ANSWERS, PALIERS_PER_LEVEL, XP_PER_PALIER } from "@/lib/progress";
 
 export const maxDuration = 60;
@@ -30,6 +32,7 @@ export async function POST(_req: Request, ctx: { params: Promise<{ id: string }>
       target: conv.level,
       levelDescription: LEVELS[conv.level as Level],
       nativeLang: conv.nativeLang,
+      onUsage: (model, usage) => void recordUsage({ userId: user.id, tier: tierOf(user), kind: "exam", model, usage }),
     });
   } catch (e) {
     console.error("[evaluate]", e instanceof ReplyError ? e.code : e);

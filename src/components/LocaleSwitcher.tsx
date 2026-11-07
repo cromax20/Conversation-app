@@ -16,6 +16,7 @@ export default function LocaleSwitcher() {
       <select aria-label={t.nav.siteLanguage} value={locale} disabled={pending}
         onChange={(e) => {
           document.cookie = `${LOCALE_COOKIE}=${e.target.value}; path=/; max-age=31536000; samesite=lax`;
+          void fetch("/api/me/locale", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ locale: e.target.value }) }).catch(() => {});
           start(() => router.refresh());
         }}>
         {LOCALES.map((l) => <option key={l.code} value={l.code}>{l.label}</option>)}

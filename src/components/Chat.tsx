@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useI18n } from "@/i18n/client";
 import Assist from "./Assist";
+import UpgradeCard from "./UpgradeCard";
 import WrittenToggle from "./WrittenToggle";
 import { useWrittenMode } from "@/lib/useWrittenMode";
 
@@ -257,6 +258,11 @@ export default function Chat(props: Props) {
         {streaming !== null && (
           <div className="msg ai"><span className="name">{props.characterName}</span><span>{streaming || "…"}</span></div>
         )}
+        {note?.upgrade && <UpgradeCard reason="limit" />}
+        {!props.pro && !note?.upgrade && props.mode === "practice" && messages.filter((m) => m.role === "user").length >= 5 && (
+          <UpgradeCard reason="teaser" name={props.characterName} />
+        )}
+        {props.mode === "exam" && exam?.passed && !props.pro && <UpgradeCard reason="exam" />}
         {note && (
           <p className="msg note" role="alert">
             {note.text}{" "}

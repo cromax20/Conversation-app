@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/db";
 import { currentUser } from "@/lib/session";
 import { voiceAllowed } from "@/lib/calls-server";
+import { STT_USD_PER_MIN, recordUsage } from "@/lib/costs";
+import { tierOf } from "@/lib/plan";
 import { transcribe, voiceEnabled } from "@/lib/voice";
 import { jsonError, notFound, unauthorized } from "@/lib/http";
 
@@ -23,6 +25,8 @@ export async function POST(req: Request) {
   if (!(await voiceAllowed(user.id, user, conv))) return jsonError(402, "pro_only", "La dictée est réservée aux formules Plus et Premium.");
 
   try {
+    // Durée estimée d'après la taille (≈ 2 Ko par seconde en Opus/WebM).
+    void recordUsage({ userId: user.id, tier: tierOf(user), kind: "stt", model: "gpt-4o-mini-transcribe", usd: (audio.size / 2000 / 60) * STT_USD_PER_MIN });
     const text = await transcribe({ audio, languageCode: conv.language });
     return Response.json({ text });
   } catch (e) {

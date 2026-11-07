@@ -15,6 +15,10 @@ Site pour pratiquer une langue en discutant avec des personnages joués par Clau
 - **Appel vidéo façon FaceTime** : fond animé avec les paysages et monuments du pays qui se succèdent (jour, coucher de soleil, nuit ; montgolfières, voiliers, passants, lucioles, lanternes, aurores…), interlocuteur entièrement personnalisable (visage, coiffure, voix, paysage), expressions du visage selon la conversation, bouche animée sur la voix, sous-titres, caméra de l'élève en vignette. Inclus dans l'abonnement, ou **gratuit une fois le niveau B2 validé** par une épreuve (réglable avec `CALL_FREE_LEVEL`).
 - **Cartes & quiz** : 10 thèmes par niveau (se présenter, famille, nourriture, voyage, opinions…), cartes créées par Claude, révision espacée, quiz à choix multiples qui rapportent des XP. Gratuit : 20 cartes, 3 quiz et 2 nouveaux paquets par jour (`FREE_DAILY_CARDS`, `FREE_DAILY_QUIZZES`, `FREE_DAILY_DECKS`). Illimité avec l'abonnement.
 - **Accueil animé** : bandeau coloré avec des « bonjour » du monde entier (un clic choisit la langue), création en 3 étapes, aperçu aux couleurs et paysages de la langue avec le visage du personnage.
+- **Économies automatiques** : coût réel mesuré à chaque appel, budget IA mensuel (l'offre gratuite fait une pause à 85 %), historique des très longues conversations raccourci par paquets, Haiku pour toutes les petites tâches.
+- **Conversion** : offre de bienvenue de 72 h (−30 % sur la 1re année des formules annuelles, avec compte à rebours), essai de 7 jours sur Plus, incitations aux bons moments (limite atteinte, après 5 répliques, après une épreuve réussie), parrainage (10 € offerts au filleul et 10 € de crédit au parrain).
+- **Relances par e-mail** (une fois par jour, dans la langue de l'utilisateur) : série en danger, retour après 7 jours, fin de l'offre de bienvenue ; désinscription en un clic.
+- **Tableau de bord** (`/admin`, réservé à `ADMIN_EMAILS`) : abonnés par formule, revenu mensuel, coût IA réel, marge estimée, conversion, budget.
 - **Voix premium** (abonnés) : écouter chaque réplique et répondre en dictée.
 - **Formules** (Stripe, mensuel ou annuel avec 2 mois offerts) :
 
@@ -73,6 +77,15 @@ Dans Stripe → **Développeurs → Webhooks**, ajoutez l'endpoint `https://VOTR
 Copiez le secret de signature (`whsec_…`) dans `STRIPE_WEBHOOK_SECRET` sur Vercel, puis redéployez.
 
 Activez aussi le **portail client** (Stripe → Paramètres → Billing → Portail client) pour que les abonnés gèrent leur abonnement et leurs factures.
+
+### 4 bis. Croissance et économies
+
+1. **Coupons Stripe** (Catalogue de produits → Coupons) :
+   - « Bienvenue » : **30 %**, durée **une fois** → identifiant dans `STRIPE_COUPON_WELCOME`.
+   - « Parrainage » : **10 €** (EUR), durée **une fois** → identifiant dans `STRIPE_COUPON_REFERRAL`.
+2. Ajoutez l'événement **`invoice.paid`** au webhook Stripe (récompense du parrain).
+3. Dans Stripe → Paramètres → Billing → Abonnements et e-mails, activez **le rappel de fin d'essai** et **les e-mails de paiement échoué** (récupère des abonnés sans rien coder).
+4. Sur Vercel : `CRON_SECRET` (relances quotidiennes, déjà déclarées dans `vercel.json`), `ADMIN_EMAILS` (votre adresse), `AI_MONTHLY_BUDGET_EUR` (par ex. 60).
 
 ### 5. Tester en ligne
 

@@ -3,7 +3,9 @@ import type { Provider } from "next-auth/providers";
 import Google from "next-auth/providers/google";
 import Resend from "next-auth/providers/resend";
 import { PrismaAdapter } from "@auth/prisma-adapter";
+import { cookies } from "next/headers";
 import { prisma } from "@/lib/db";
+import { isReferralCode } from "@/lib/growth";
 
 const providers: Provider[] = [];
 
@@ -38,6 +40,22 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   session: { strategy: "database" },
   trustHost: true,
   pages: { signIn: "/login", verifyRequest: "/login?sent=1" },
+  events: {
+    // Nouveau compte : on garde le code du parrain (cookie posé par le lien) et la langue du site.
+    async createUser({ user }) {
+      try {
+        const jar = await cookies();
+        const ref = jar.get("ref")?.value?.toUpperCase();
+        const locale = jar.get("locale")?.value;
+        const data: { referredBy?: string; locale?: string } = {};
+        if (isReferralCode(ref) && (await prisma.user.count({ where: { referralCode: ref } }))) data.referredBy = ref;
+        if (locale) data.locale = locale;
+        if (user.id && Object.keys(data).length) await prisma.user.update({ where: { id: user.id }, data });
+      } catch (e) {
+        console.error("[auth] createUser", e);
+      }
+    },
+  },
   callbacks: {
     session({ session, user }) {
       session.user.id = user.id;

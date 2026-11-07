@@ -5,6 +5,8 @@ import { jsonError, unauthorized } from "@/lib/http";
 import { generateDeck, ReplyError } from "@/lib/claude";
 import { TOPICS, isTopic } from "@/lib/cards";
 import { cardsUsage, over } from "@/lib/cards-server";
+import { budgetBlocks, recordUsage } from "@/lib/costs";
+import { tierOf } from "@/lib/plan";
 
 export const maxDuration = 60;
 
@@ -23,9 +25,13 @@ export async function POST(req: Request) {
   const usage = await cardsUsage(user.id, user);
   if (over(usage, "decks")) return jsonError(429, "decks_limit", "Limite de paquets atteinte.");
 
+  const tier = tierOf(user);
+  if (await budgetBlocks(tier)) return jsonError(503, "budget_paused", "Trop de demande pour le moment. Réessayez plus tard.");
+
   const last = await prisma.conversation.findFirst({ where: { userId: user.id, progressKey: key }, orderBy: { updatedAt: "desc" }, select: { nativeLang: true } });
   try {
-    const cards = await generateDeck({ languageName: progress.languageName, level: progress.level, nativeLang: last?.nativeLang ?? "français", topic: TOPICS.find((x) => x.id === topic)!.fr });
+    const cards = await generateDeck({ languageName: progress.languageName, level: progress.level, nativeLang: last?.nativeLang ?? "français", topic: TOPICS.find((x) => x.id === topic)!.fr,
+      onUsage: (model, usage) => void recordUsage({ userId: user.id, tier, kind: "deck", model, usage }) });
     if ("refused" in cards) return jsonError(422, "refused", "Refusé.");
     const [deck] = await prisma.$transaction([
       prisma.deck.create({ data: { userId: user.id, key, languageName: progress.languageName, level: progress.level, topic, cards } }),

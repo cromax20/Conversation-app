@@ -79,6 +79,7 @@ test("la limite gratuite bloque après le quota du jour", async ({ page, context
   await page.getByRole("button", { name: "Envoyer" }).click();
   await expect(page.locator(".msg.note")).toContainText("réponses gratuites du jour");
   await expect(page.getByRole("link", { name: "Voir l'abonnement" })).toBeVisible();
+  await expect(page.getByTestId("upgrade-limit")).toContainText("Essayer Plus gratuitement");
 });
 
 test("un abonné a la voix ; l'épreuve de passage fait monter de niveau", async ({ page, context }) => {
@@ -444,4 +445,108 @@ test("paiement : formule ou période invalide refusée", async ({ page, context 
   await page.goto("/");
   expect((await page.request.post("/api/billing/checkout", { data: { tier: "gold", interval: "month" } })).status()).toBe(400);
   expect((await page.request.post("/api/billing/checkout", { data: { tier: "plus", interval: "week" } })).status()).toBe(400);
+});
+
+test("offre de bienvenue : bandeau, compte à rebours et prix annuels réduits pendant 72 h", async ({ page, context }) => {
+  await signIn(context);
+  await page.goto("/");
+  await expect(page.getByTestId("offer-bar")).toContainText("−30 %");
+  await expect(page.getByTestId("offer-bar")).toContainText(/7[01] h/);
+  await page.getByTestId("offer-bar").getByRole("link").click();
+  await expect(page.getByTestId("welcome-offer")).toBeVisible();
+  await expect(page.getByTestId("was-plus")).toContainText("129");
+  await expect(page.getByTestId("tier-plus")).toContainText("90,30");
+});
+
+test("pas d'offre de bienvenue après 72 h ni pour les abonnés", async ({ page, context }) => {
+  await signIn(context, { createdAt: new Date(Date.now() - 4 * 86_400_000) });
+  await page.goto("/abonnement");
+  await expect(page.getByTestId("offer-bar")).toHaveCount(0);
+  await expect(page.getByTestId("welcome-offer")).toHaveCount(0);
+});
+
+test("incitation : après 5 répliques, un utilisateur gratuit voit l'offre Plus", async ({ page, context }) => {
+  const user = await signIn(context, { createdAt: new Date(Date.now() - 4 * 86_400_000) });
+  const conv = await db.conversation.create({ data: { userId: user.id, title: "t", language: "es", languageName: "Espagnol", progressKey: "es", level: "A2", nativeLang: "français", scene: "free", context: "", character: { name: "Lucía", age: 30, city: "", job: "barista", trait: "calme et très patient·e", hobby: "le football" }, systemPrompt: "x" } });
+  await db.languageProgress.create({ data: { userId: user.id, key: "es", languageName: "Espagnol", level: "A2", startLevel: "A2" } });
+  for (let i = 0; i < 5; i++) {
+    await db.message.create({ data: { conversationId: conv.id, role: "assistant", text: `r${i}`, createdAt: new Date(Date.now() - 2 * 86_400_000) } });
+    await db.message.create({ data: { conversationId: conv.id, role: "user", text: `u${i}`, createdAt: new Date(Date.now() - 2 * 86_400_000) } });
+  }
+  await page.goto(`/c/${conv.id}`);
+  await expect(page.getByTestId("upgrade-teaser")).toContainText("Lucía");
+  await page.getByRole("button", { name: "Plus tard" }).click();
+  await expect(page.getByTestId("upgrade-teaser")).toHaveCount(0);
+});
+
+test("parrainage : lien personnel, inscrits comptés, cookie posé par le lien", async ({ page, context, browser }) => {
+  const user = await signIn(context);
+  await page.goto("/parrainage");
+  const link = await page.getByLabel("Votre lien de parrainage").inputValue();
+  const code = new URL(link).searchParams.get("ref")!;
+  expect(code).toMatch(/^[A-Z0-9]{5,10}$/);
+  await db.user.create({ data: { email: `filleul-${Date.now()}@exemple.test`, referredBy: code } });
+  await page.reload();
+  await expect(page.getByTestId("ref-invited")).toHaveText("1");
+  const ctx2 = await browser.newContext({ locale: "fr-FR" });
+  const p2 = await ctx2.newPage();
+  await p2.goto(`/?ref=${code}`);
+  await expect.poll(async () => (await ctx2.cookies()).find((c) => c.name === "ref")?.value).toBe(code);
+  await ctx2.close();
+  expect(user.id).toBeTruthy();
+});
+
+test("budget IA : près du plafond, l'offre gratuite fait une pause mais pas les abonnés", async ({ page, context, browser }) => {
+  const spend = await db.aiUsage.create({ data: { tier: "free", kind: "reply", model: "claude-haiku-5-5", costMicros: 60_000_000 } }); // ≈ 55 € > 85 % de 50 €
+  try {
+    const free = await signIn(context);
+    await page.goto("/");
+    const conv = await db.conversation.create({ data: { userId: free.id, title: "t", language: "es", languageName: "Espagnol", progressKey: "es", level: "A2", nativeLang: "français", scene: "free", context: "", character: { name: "A", age: 30, city: "", job: "barista", trait: "calme et très patient·e", hobby: "le football" }, systemPrompt: "x" } });
+    const r = await page.request.post(`/api/conversations/${conv.id}/reply`, { data: {} });
+    expect(r.status()).toBe(503);
+    expect((await r.json()).error.code).toBe("budget_paused");
+
+    const ctx2 = await browser.newContext({ locale: "fr-FR" });
+    const pro = await signIn(ctx2, { plan: "plus" });
+    const p2 = await ctx2.newPage();
+    await p2.goto("/");
+    const conv2 = await db.conversation.create({ data: { userId: pro.id, title: "t", language: "es", languageName: "Espagnol", progressKey: "es", level: "A2", nativeLang: "français", scene: "free", context: "", character: { name: "A", age: 30, city: "", job: "barista", trait: "calme et très patient·e", hobby: "le football" }, systemPrompt: "x" } });
+    expect((await p2.request.post(`/api/conversations/${conv2.id}/reply`, { data: {} })).status()).toBe(200);
+    await ctx2.close();
+  } finally {
+    await db.aiUsage.delete({ where: { id: spend.id } });
+  }
+});
+
+test("tableau de bord réservé au propriétaire, avec revenus et coûts", async ({ page, context, browser }) => {
+  await db.user.deleteMany({ where: { email: "admin@exemple.test" } });
+  await signIn(context, { email: "admin@exemple.test" });
+  await db.user.create({ data: { email: `prem-${Date.now()}@exemple.test`, subscriptionStatus: "active", plan: "premium", billingInterval: "year", currentPeriodEnd: new Date(Date.now() + 300 * 86_400_000) } });
+  await page.goto("/admin");
+  await expect(page.getByTestId("admin")).toContainText("Revenu mensuel récurrent");
+  await expect(page.getByTestId("admin")).toContainText("Budget IA mensuel");
+  await expect(page.getByTestId("admin")).toContainText("Premium");
+  const ctx2 = await browser.newContext({ locale: "fr-FR" });
+  await signIn(ctx2);
+  const p2 = await ctx2.newPage();
+  expect((await p2.goto("/admin"))!.status()).toBe(404);
+  await ctx2.close();
+});
+
+test("relances : série en danger envoyée une fois par jour, désinscription en un clic", async ({ request }) => {
+  const today = new Date(); const y = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()) - 86_400_000);
+  const u = await db.user.create({ data: { email: `streak-${Date.now()}@exemple.test`, streakDays: 4, lastPracticeDay: y, createdAt: new Date(Date.now() - 10 * 86_400_000), locale: "es" } });
+  expect((await request.get("/api/cron/daily")).status()).toBe(401);
+  const r = await request.get("/api/cron/daily", { headers: { authorization: "Bearer cron_e2e" } });
+  expect(r.status()).toBe(200);
+  expect((await r.json()).sent.streak).toBeGreaterThanOrEqual(1);
+  expect((await db.user.findUniqueOrThrow({ where: { id: u.id } })).lastEmailAt).not.toBeNull();
+  const again = await request.get("/api/cron/daily", { headers: { authorization: "Bearer cron_e2e" } });
+  expect((await again.json()).sent.streak).toBe(0); // pas deux fois le même jour
+
+  const { createHmac } = await import("node:crypto");
+  const s = createHmac("sha256", "e2e-secret-e2e-secret-e2e-secret-123").update(`unsub:${u.id}`).digest("base64url").slice(0, 24);
+  expect((await request.get(`/api/email/unsubscribe?u=${u.id}&s=faux`)).status()).toBe(400);
+  expect((await request.get(`/api/email/unsubscribe?u=${u.id}&s=${s}`)).status()).toBe(200);
+  expect((await db.user.findUniqueOrThrow({ where: { id: u.id } })).emailOptOut).toBe(true);
 });

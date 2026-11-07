@@ -7,10 +7,11 @@ export const db = new PrismaClient({
 });
 
 /** Crée un compte et une session directement en base, puis pose le cookie de connexion. */
-export async function signIn(context: BrowserContext, opts: { pro?: boolean; plan?: "essential" | "plus" | "premium" } = {}) {
+export async function signIn(context: BrowserContext, opts: { pro?: boolean; plan?: "essential" | "plus" | "premium"; email?: string; createdAt?: Date } = {}) {
   const user = await db.user.create({
     data: {
-      email: `e2e-${randomUUID()}@exemple.test`,
+      email: opts.email ?? `e2e-${randomUUID()}@exemple.test`,
+      ...(opts.createdAt ? { createdAt: opts.createdAt } : {}),
       name: "Élève test",
       ...(opts.pro || opts.plan ? { plan: opts.plan ?? null, subscriptionStatus: "active", currentPeriodEnd: new Date(Date.now() + 30 * 864e5), stripeCustomerId: `cus_${randomUUID()}` } : {}),
     },

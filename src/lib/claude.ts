@@ -14,9 +14,22 @@ function fallbackParams(model: string) {
 
 export type StoredMessage = { role: string; text: string; content: unknown };
 
+export type Usage = { input_tokens?: number | null; output_tokens?: number | null; cache_read_input_tokens?: number | null; cache_creation_input_tokens?: number | null };
+export type OnUsage = (model: string, usage: Usage) => void;
+
 export type ReplyResult =
-  | { kind: "ok"; text: string; content: Anthropic.Beta.BetaContentBlock[] }
-  | { kind: "refused" };
+  | { kind: "ok"; text: string; content: Anthropic.Beta.BetaContentBlock[]; usage?: Usage }
+  | { kind: "refused"; usage?: Usage };
+
+// Très longues conversations : on retire les plus anciens messages par paquets de 20
+// (le début change rarement, la mise en cache reste efficace). Retirer depuis le début est permis.
+export const HISTORY_MAX = 60;
+export const HISTORY_KEEP = 40;
+export function windowHistory<T>(history: T[]): T[] {
+  if (history.length <= HISTORY_MAX) return history;
+  const drop = Math.floor((history.length - HISTORY_KEEP) / 20) * 20;
+  return history.slice(drop);
+}
 
 export type ReplyErrorCode = "rate_limited" | "overloaded" | "auth" | "bad_request" | "network" | "unknown";
 
@@ -79,7 +92,7 @@ export async function streamReply(opts: {
       model: opts.model,
       max_tokens: 4096, // répliques volontairement courtes (1 à 3 phrases, ou un bilan)
       system: [{ type: "text", text: opts.system, cache_control: { type: "ephemeral" } }],
-      messages: buildMessages(opts.history),
+      messages: buildMessages(windowHistory(opts.history)),
       // Conversation simple : effort bas = réponses rapides et moins chères.
       output_config: { effort: "low" },
       ...fallbackParams(opts.model),
@@ -91,13 +104,13 @@ export async function streamReply(opts: {
   try {
     stream.on("text", (delta) => opts.onText(delta));
     const final = await stream.finalMessage();
-    if (final.stop_reason === "refusal") return { kind: "refused" };
+    if (final.stop_reason === "refusal") return { kind: "refused", usage: final.usage };
     const text = final.content
       .filter((b): b is Anthropic.Beta.BetaTextBlock => b.type === "text")
       .map((b) => b.text)
       .join("")
       .trim();
-    return { kind: "ok", text, content: final.content };
+    return { kind: "ok", text, content: final.content, usage: final.usage };
   } catch (e) {
     if (opts.signal?.aborted) throw e;
     throw mapError(e);
@@ -144,6 +157,7 @@ export async function evaluateExam(opts: {
   target: string;
   levelDescription: string;
   nativeLang: string;
+  onUsage?: OnUsage;
 }): Promise<ExamResult | { refused: true }> {
   if (process.env.MOCK_AI === "1") {
     const answers = opts.transcript.filter((m) => m.role === "user").length;
@@ -173,6 +187,7 @@ ${lines}
       output_config: { effort: "medium", format: { type: "json_schema", schema: EXAM_SCHEMA } },
       ...fallbackParams(model),
     });
+    opts.onUsage?.(model, res.usage);
     if (res.stop_reason === "refusal") return { refused: true };
     const text = res.content.filter((b): b is Anthropic.Beta.BetaTextBlock => b.type === "text").map((b) => b.text).join("");
     const r = JSON.parse(text) as ExamResult;
@@ -185,7 +200,7 @@ ${lines}
 
 // ---- Coup de pouce pour les débutants ----
 
-async function structured<T>(system: string, prompt: string, schema: Record<string, unknown>): Promise<T | { refused: true }> {
+async function structured<T>(system: string, prompt: string, schema: Record<string, unknown>, onUsage?: OnUsage): Promise<T | { refused: true }> {
   try {
     const model = utilityModel();
     const res = await getClient().beta.messages.create({
@@ -196,6 +211,7 @@ async function structured<T>(system: string, prompt: string, schema: Record<stri
       output_config: { effort: "low", format: { type: "json_schema", schema } },
       ...fallbackParams(model),
     });
+    onUsage?.(model, res.usage);
     if (res.stop_reason === "refusal") return { refused: true };
     const text = res.content.filter((b): b is Anthropic.Beta.BetaTextBlock => b.type === "text").map((b) => b.text).join("");
     return JSON.parse(text) as T;
@@ -220,7 +236,7 @@ const PHRASES_SCHEMA = {
 };
 
 /** 8 phrases utiles pour démarrer, adaptées à la situation et au niveau. */
-export async function generatePhrases(opts: { languageName: string; level: string; nativeLang: string; situation: string }): Promise<Phrase[] | { refused: true }> {
+export async function generatePhrases(opts: { languageName: string; level: string; nativeLang: string; situation: string; onUsage?: OnUsage }): Promise<Phrase[] | { refused: true }> {
   if (process.env.MOCK_AI === "1") {
     return Array.from({ length: 8 }, (_, i) => ({ text: `Frase útil ${i + 1}`, pronunciation: i === 0 ? "fra-sé ou-til" : "", translation: `Phrase utile ${i + 1}` }));
   }
@@ -235,6 +251,7 @@ Donne exactement 8 phrases courtes et très utiles pour se débrouiller dans cet
 - pronunciation : une aide à la prononciation lisible pour un·e locuteur·rice de ${opts.nativeLang} (translittération si l'écriture n'est pas latine) ; chaîne vide si inutile.
 - translation : la traduction en ${opts.nativeLang}.`,
     PHRASES_SCHEMA,
+    opts.onUsage,
   );
   return "refused" in r ? r : r.phrases.slice(0, 8);
 }
@@ -250,7 +267,7 @@ const TRANSLATION_SCHEMA = {
  * Traduit une phrase de l'élève vers la langue apprise (toTarget),
  * ou une réplique du personnage vers la langue de l'élève (toNative).
  */
-export async function translate(opts: { text: string; direction: "toTarget" | "toNative"; languageName: string; level: string; nativeLang: string }): Promise<Translation | { refused: true }> {
+export async function translate(opts: { text: string; direction: "toTarget" | "toNative"; languageName: string; level: string; nativeLang: string; onUsage?: OnUsage }): Promise<Translation | { refused: true }> {
   if (process.env.MOCK_AI === "1") {
     return opts.direction === "toTarget"
       ? { translation: `[${opts.languageName}] ${opts.text}`, pronunciation: "pro-non-cia-tion", note: "Note simulée." }
@@ -271,6 +288,7 @@ export async function translate(opts: { text: string; direction: "toTarget" | "t
 - pronunciation : vide.
 - note : en ${opts.nativeLang}, une phrase courte sur une expression intéressante de la réplique ; vide si inutile.`,
     TRANSLATION_SCHEMA,
+    opts.onUsage,
   );
 }
 
@@ -288,7 +306,7 @@ const DECK_SCHEMA = {
 };
 
 /** Paquet de 10 cartes pour un thème et un niveau, pensé pour les conversations et les appels. */
-export async function generateDeck(opts: { languageName: string; level: string; nativeLang: string; topic: string }): Promise<Card[] | { refused: true }> {
+export async function generateDeck(opts: { languageName: string; level: string; nativeLang: string; topic: string; onUsage?: OnUsage }): Promise<Card[] | { refused: true }> {
   if (process.env.MOCK_AI === "1") {
     return Array.from({ length: 10 }, (_, i) => ({ front: `Palabra ${i + 1}`, pronunciation: i === 0 ? "pa-la-bra" : "", back: `Mot ${i + 1}`, example: `Ejemplo ${i + 1}.` }));
   }
@@ -304,6 +322,7 @@ Crée exactement 10 cartes adaptées au niveau ${opts.level} : des mots, express
 - example : une phrase d'exemple courte dans la langue cible, de niveau ${opts.level}.
 Toutes les traductions (back) doivent être différentes les unes des autres.`,
     DECK_SCHEMA,
+    opts.onUsage,
   );
   return "refused" in r ? r : r.cards.slice(0, 10);
 }

@@ -4,6 +4,7 @@ import { currentUser } from "@/lib/session";
 import { features, tierOf } from "@/lib/plan";
 import { freeCallUnlocked } from "@/lib/calls";
 import { voiceAllowed } from "@/lib/calls-server";
+import { TTS_USD_PER_CHAR, budgetBlocks, recordUsage } from "@/lib/costs";
 import { synthesize, voiceEnabled } from "@/lib/voice";
 
 import { jsonError, notFound, unauthorized } from "@/lib/http";
@@ -20,6 +21,9 @@ export async function POST(req: Request) {
   const parsed = z.object({ messageId: z.string().optional(), preview: z.object({ voice: z.string(), language: z.string() }).optional() }).safeParse(await req.json().catch(() => null));
   if (!parsed.success || (!parsed.data.messageId && !parsed.data.preview)) return jsonError(400, "invalid", "Requête invalide.");
 
+  const tier = tierOf(user);
+  if (await budgetBlocks(tier)) return jsonError(503, "budget_paused", "Trop de demande pour le moment. Réessayez plus tard.");
+
   // Aperçu d'une voix lors de la création d'un interlocuteur.
   if (parsed.data.preview) {
     if (!pro) {
@@ -27,6 +31,7 @@ export async function POST(req: Request) {
       if (!progress.some((p) => freeCallUnlocked(p))) return jsonError(402, "pro_only", "La voix est réservée aux abonnés.");
     }
     try {
+      void recordUsage({ userId: user.id, tier, kind: "tts", model: "gpt-4o-mini-tts", usd: PREVIEW_TEXT.length * TTS_USD_PER_CHAR });
       const audio = await synthesize({ text: PREVIEW_TEXT, characterName: "", languageFr: parsed.data.preview.language.slice(0, 60), level: "B1", voice: parsed.data.preview.voice });
       return new Response(audio, { headers: { "Content-Type": "audio/mpeg" } });
     } catch (e) {
@@ -44,6 +49,7 @@ export async function POST(req: Request) {
   if (!(await voiceAllowed(user.id, user, msg.conversation))) return jsonError(402, "pro_only", "La voix est réservée aux formules Plus et Premium.");
 
   try {
+    void recordUsage({ userId: user.id, tier, kind: "tts", model: "gpt-4o-mini-tts", usd: Math.min(4000, msg.text.length) * TTS_USD_PER_CHAR });
     const audio = await synthesize({
       text: msg.text,
       characterName: (msg.conversation.character as { name?: string }).name || msg.conversation.id,

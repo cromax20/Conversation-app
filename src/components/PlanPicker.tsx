@@ -14,6 +14,7 @@ type Props = {
   trialDays: Partial<Record<PaidTier, number>>;
   callMinutes: number;
   callLevel: string;
+  welcomePercent: number; // réduction de bienvenue sur la 1re année (0 = aucune)
 };
 
 const TIERS: Tier[] = ["free", "essential", "plus", "premium"];
@@ -53,8 +54,11 @@ export default function PlanPicker(p: Props) {
               {tier === "plus" && <span className="ribbon">{t.plans.popular}</span>}
               <h2>{t.plans.names[tier]}</h2>
               <p className="muted small" style={{ margin: 0 }}>{t.plans.taglines[tier]}</p>
+              {tier !== "free" && interval === "year" && p.welcomePercent > 0 && (
+                <span className="was" data-testid={`was-${tier}`}><s>{money(price)}</s> −{p.welcomePercent} %</span>
+              )}
               <div className="price">
-                {money(price)}<span className="per">{tier === "free" ? "" : interval === "month" ? ` ${t.plans.perMonth}` : ` ${t.plans.perYear}`}</span>
+                {money(tier !== "free" && interval === "year" && p.welcomePercent > 0 ? Math.round(price * (100 - p.welcomePercent)) / 100 : price)}<span className="per">{tier === "free" ? "" : interval === "month" ? ` ${t.plans.perMonth}` : ` ${t.plans.perYear}`}</span>
               </div>
               {tier !== "free" && interval === "year" && <span className="muted small">{t.plans.equiv(money(Math.round((price / 12) * 100) / 100))}</span>}
               {trial && <span className="trial-badge">🎁 {t.plans.trial(trial)}</span>}
