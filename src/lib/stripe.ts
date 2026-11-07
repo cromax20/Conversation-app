@@ -1,5 +1,6 @@
 import Stripe from "stripe";
 import { prisma } from "./db";
+import { isPaidTier, tierFromPrice } from "./plan";
 
 let stripe: Stripe | null = null;
 export function getStripe(): Stripe {
@@ -17,11 +18,23 @@ export function periodEnd(sub: Stripe.Subscription): Date | null {
   return typeof ts === "number" ? new Date(ts * 1000) : null;
 }
 
+/** Formule d'un abonnement : d'après son prix, sinon d'après les métadonnées posées au paiement. */
+export function subscriptionTier(sub: Stripe.Subscription) {
+  const price = sub.items?.data?.[0]?.price;
+  const priceId = typeof price === "string" ? price : price?.id;
+  return tierFromPrice(priceId) ?? (isPaidTier(sub.metadata?.tier) ? sub.metadata.tier : null);
+}
+
 /** Recopie l'état d'un abonnement Stripe sur l'utilisateur correspondant. */
 export async function syncSubscription(sub: Stripe.Subscription) {
   const customerId = typeof sub.customer === "string" ? sub.customer : sub.customer.id;
   const userId = sub.metadata?.userId;
-  const data = { subscriptionId: sub.id, subscriptionStatus: sub.status, currentPeriodEnd: periodEnd(sub), stripeCustomerId: customerId };
+  const tier = subscriptionTier(sub);
+  const data = {
+    subscriptionId: sub.id, subscriptionStatus: sub.status, currentPeriodEnd: periodEnd(sub), stripeCustomerId: customerId,
+    ...(tier ? { plan: tier } : {}),
+    ...(sub.status === "trialing" || sub.trial_end ? { hadTrial: true } : {}),
+  };
   const byCustomer = await prisma.user.updateMany({ where: { stripeCustomerId: customerId }, data });
   if (byCustomer.count === 0 && userId) {
     await prisma.user.update({ where: { id: userId }, data });

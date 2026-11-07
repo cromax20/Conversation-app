@@ -13,7 +13,7 @@ import { useWrittenMode } from "@/lib/useWrittenMode";
 type Msg = { id: string; role: "user" | "assistant"; text: string };
 type Props = {
   conversationId: string; progressKey: string; name: string; age: number; avatar: Avatar; languageLabel: string;
-  initialMessages: Msg[]; remaining: number; theme: Theme;
+  initialMessages: Msg[]; remaining: number; theme: Theme; endsAt?: number | null;
 };
 
 export default function CallRoom(p: Props) {
@@ -51,6 +51,18 @@ export default function CallRoom(p: Props) {
     const id = setInterval(() => setSeconds((s) => s + 1), 1000);
     return () => clearInterval(id);
   }, [phase]);
+
+  // Appel gratuit : raccroche automatiquement à la fin du temps imparti.
+  const [left, setLeft] = useState<number | null>(p.endsAt ? Math.max(0, Math.round((p.endsAt - Date.now()) / 1000)) : null);
+  useEffect(() => {
+    if (!p.endsAt) return;
+    const id = setInterval(() => {
+      const s = Math.max(0, Math.round((p.endsAt! - Date.now()) / 1000));
+      setLeft(s);
+      if (s === 0) { clearInterval(id); hangUpRef.current(); }
+    }, 1000);
+    return () => clearInterval(id);
+  }, [p.endsAt]);
 
   useEffect(() => () => { cancelAnimationFrame(rafRef.current); audioRef.current?.pause(); camStream.current?.getTracks().forEach((x) => x.stop()); }, []);
 
@@ -180,6 +192,8 @@ export default function CallRoom(p: Props) {
     } catch { setError(t.chat.micDenied); }
   }
 
+  const hangUpRef = useRef<() => void>(() => {});
+  hangUpRef.current = () => hangUp();
   function hangUp() {
     audioRef.current?.pause(); cancelAnimationFrame(rafRef.current); recRef.current?.state === "recording" && recRef.current.stop();
     camStream.current?.getTracks().forEach((x) => x.stop()); setCamOn(false);
@@ -194,7 +208,10 @@ export default function CallRoom(p: Props) {
       <CountryBackdrop className="call-bg" theme={p.theme} scenery={p.avatar.scenery} time={p.avatar.time} />
       <div className="call-top">
         <span><b>{p.name}</b> · {p.languageLabel}</span>
-        <span className="call-timer">{phase === "active" ? t.call.duration(mm, ss) : ""}</span>
+        <span className="call-timer">
+          {phase === "active" ? t.call.duration(mm, ss) : ""}
+          {left !== null && <span className="call-left" data-testid="call-left"> · ⏳ {t.call.duration(Math.floor(left / 60), left % 60)}</span>}
+        </span>
       </div>
       <AvatarFace className={`call-face ${status === "speaking" ? "talking" : ""}`} avatar={p.avatar} expression={expression} mouth={mouth} age={p.age} />
       {camOn && <video ref={camRef} className="call-cam" autoPlay muted playsInline />}

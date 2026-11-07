@@ -61,7 +61,7 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
           nativeName={nativeName}
           characterName={name}
           initialMessages={conv.messages.map((m) => ({ id: m.id, role: m.role as "user" | "assistant", text: m.text }))}
-          pro={quota.pro}
+          pro={quota.features.voice}
           voiceAvailable={voiceEnabled()}
           remaining={quota.remaining}
           limit={quota.limit}

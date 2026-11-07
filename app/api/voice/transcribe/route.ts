@@ -1,7 +1,6 @@
 import { prisma } from "@/lib/db";
 import { currentUser } from "@/lib/session";
-import { isPro } from "@/lib/plan";
-import { freeCallUnlocked } from "@/lib/calls";
+import { voiceAllowed } from "@/lib/calls-server";
 import { transcribe, voiceEnabled } from "@/lib/voice";
 import { jsonError, notFound, unauthorized } from "@/lib/http";
 
@@ -21,12 +20,7 @@ export async function POST(req: Request) {
 
   const conv = await prisma.conversation.findFirst({ where: { id: conversationId, userId: user.id } });
   if (!conv) return notFound();
-  if (!isPro(user)) {
-    const progress = conv.mode === "call"
-      ? await prisma.languageProgress.findUnique({ where: { userId_key: { userId: user.id, key: conv.progressKey } } })
-      : null;
-    if (!freeCallUnlocked(progress)) return jsonError(402, "pro_only", "La dictée est réservée aux abonnés.");
-  }
+  if (!(await voiceAllowed(user.id, user, conv))) return jsonError(402, "pro_only", "La dictée est réservée aux formules Plus et Premium.");
 
   try {
     const text = await transcribe({ audio, languageCode: conv.language });

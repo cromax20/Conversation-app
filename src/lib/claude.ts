@@ -2,7 +2,15 @@ import Anthropic from "@anthropic-ai/sdk";
 import { KICKOFF } from "./characters";
 import type { Card } from "./cards";
 
-export const CLAUDE_MODEL = process.env.CLAUDE_MODEL || "claude-opus-5-5";
+import { examModel, utilityModel } from "./plan";
+
+/**
+ * Repli automatique quand un filtre de sécurité décline une demande : disponible sur Opus et Sonnet,
+ * pas sur Haiku (où le paramètre est refusé ou sans effet).
+ */
+function fallbackParams(model: string) {
+  return /opus|sonnet|fable|mythos/.test(model) ? { betas: ["server-side-fallback-2026-07-01"] as string[], fallbacks: "default" as const } : {};
+}
 
 export type StoredMessage = { role: string; text: string; content: unknown };
 
@@ -58,6 +66,7 @@ function mapError(e: unknown): ReplyError {
  * Renvoie le message final, ou { kind: "refused" } si le modèle a décliné.
  */
 export async function streamReply(opts: {
+  model: string;
   system: string;
   history: StoredMessage[];
   onText: (delta: string) => void;
@@ -67,15 +76,13 @@ export async function streamReply(opts: {
 
   const stream = getClient().beta.messages.stream(
     {
-      model: CLAUDE_MODEL,
+      model: opts.model,
       max_tokens: 4096, // répliques volontairement courtes (1 à 3 phrases, ou un bilan)
       system: [{ type: "text", text: opts.system, cache_control: { type: "ephemeral" } }],
       messages: buildMessages(opts.history),
       // Conversation simple : effort bas = réponses rapides et moins chères.
       output_config: { effort: "low" },
-      // Si un filtre de sécurité décline la demande, l'API réessaie sur le modèle recommandé.
-      betas: ["server-side-fallback-2026-07-01"],
-      fallbacks: "default",
+      ...fallbackParams(opts.model),
       cache_control: { type: "ephemeral" },
     },
     { signal: opts.signal },
@@ -144,8 +151,9 @@ export async function evaluateExam(opts: {
   }
   const lines = opts.transcript.map((m) => `${m.role === "user" ? "ÉLÈVE" : "EXAMINATEUR"} : ${m.text}`).join("\n");
   try {
+    const model = examModel();
     const res = await getClient().beta.messages.create({
-      model: CLAUDE_MODEL,
+      model,
       max_tokens: 4096,
       system: `Tu évalues des épreuves orales de langue selon le CECRL, de façon juste et encourageante. Tu écris tes commentaires en ${opts.nativeLang}.`,
       messages: [{
@@ -163,8 +171,7 @@ ${lines}
 </transcription>`,
       }],
       output_config: { effort: "medium", format: { type: "json_schema", schema: EXAM_SCHEMA } },
-      betas: ["server-side-fallback-2026-07-01"],
-      fallbacks: "default",
+      ...fallbackParams(model),
     });
     if (res.stop_reason === "refusal") return { refused: true };
     const text = res.content.filter((b): b is Anthropic.Beta.BetaTextBlock => b.type === "text").map((b) => b.text).join("");
@@ -180,14 +187,14 @@ ${lines}
 
 async function structured<T>(system: string, prompt: string, schema: Record<string, unknown>): Promise<T | { refused: true }> {
   try {
+    const model = utilityModel();
     const res = await getClient().beta.messages.create({
-      model: CLAUDE_MODEL,
+      model,
       max_tokens: 4096,
       system,
       messages: [{ role: "user", content: prompt }],
       output_config: { effort: "low", format: { type: "json_schema", schema } },
-      betas: ["server-side-fallback-2026-07-01"],
-      fallbacks: "default",
+      ...fallbackParams(model),
     });
     if (res.stop_reason === "refusal") return { refused: true };
     const text = res.content.filter((b): b is Anthropic.Beta.BetaTextBlock => b.type === "text").map((b) => b.text).join("");

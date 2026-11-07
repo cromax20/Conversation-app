@@ -16,7 +16,18 @@ Site pour pratiquer une langue en discutant avec des personnages joués par Clau
 - **Cartes & quiz** : 10 thèmes par niveau (se présenter, famille, nourriture, voyage, opinions…), cartes créées par Claude, révision espacée, quiz à choix multiples qui rapportent des XP. Gratuit : 20 cartes, 3 quiz et 2 nouveaux paquets par jour (`FREE_DAILY_CARDS`, `FREE_DAILY_QUIZZES`, `FREE_DAILY_DECKS`). Illimité avec l'abonnement.
 - **Accueil animé** : bandeau coloré avec des « bonjour » du monde entier (un clic choisit la langue), création en 3 étapes, aperçu aux couleurs et paysages de la langue avec le visage du personnage.
 - **Voix premium** (abonnés) : écouter chaque réplique et répondre en dictée.
-- **Paiement** : formule gratuite limitée (10 réponses/jour) et abonnement mensuel Stripe (300 réponses/jour + voix + appels).
+- **Formules** (Stripe, mensuel ou annuel avec 2 mois offerts) :
+
+  | | Gratuit | Essentiel | Plus ⭐ | Premium |
+  |---|---|---|---|---|
+  | Prix | 0 € | 7,99 € / mois · 79 € / an | 12,99 € / mois · 129 € / an (7 jours d'essai) | 19,99 € / mois · 199 € / an |
+  | Personnages | Claude Haiku 5.5 | Claude Haiku 5.5 | Claude Sonnet 5.5 | Claude Opus 5.5 |
+  | Répliques / jour | 10 | 100 | 100 | 150 |
+  | Cartes & quiz | limités | illimités | illimités | illimités |
+  | Voix et dictée | – | – | ✅ | ✅ |
+  | Appels vidéo | 1 appel de 10 min / semaine une fois B2 validé | idem | ✅ | ✅ |
+
+  Les petites tâches (traductions, phrases utiles, paquets de cartes) utilisent toujours Claude Haiku 5.5 ; les épreuves sont notées par Claude Sonnet 5.5 pour tout le monde.
 
 Les visages et les paysages sont des illustrations animées (SVG), sans photos ni service vidéo externe.
 
@@ -33,11 +44,13 @@ Technique : Next.js 16, Auth.js, Prisma + Postgres, API Claude (`@anthropic-ai/s
 | [Neon](https://neon.tech) (ou Vercel Postgres) | Base de données | `DATABASE_URL` (URL *pooled*) et `DIRECT_URL` (URL directe) |
 | [Anthropic](https://console.anthropic.com) | Les personnages | `ANTHROPIC_API_KEY` |
 | [OpenAI](https://platform.openai.com) | Voix et dictée | `OPENAI_API_KEY` |
-| [Stripe](https://dashboard.stripe.com) | Abonnement | `STRIPE_SECRET_KEY`, `STRIPE_PRICE_ID`, `STRIPE_WEBHOOK_SECRET` (étape 4) |
+| [Stripe](https://dashboard.stripe.com) | Abonnements | `STRIPE_SECRET_KEY`, les 6 `STRIPE_PRICE_…`, `STRIPE_WEBHOOK_SECRET` (étape 4) |
 | [Resend](https://resend.com) | E-mails de connexion | `AUTH_RESEND_KEY` et une adresse d'envoi vérifiée `EMAIL_FROM` |
 | [Google Cloud](https://console.cloud.google.com/apis/credentials) | Bouton « Continuer avec Google » | `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET` |
 
-Dans Stripe, créez un **produit** « Abonnement » avec un **prix récurrent mensuel** (par ex. 9 €), puis copiez son ID `price_…` dans `STRIPE_PRICE_ID`. Commencez en **mode test**.
+Dans Stripe (en **mode test** pour commencer), créez **3 produits** : Essentiel, Plus et Premium. Pour chacun, ajoutez **2 prix récurrents** (mensuel et annuel, voir le tableau ci-dessus), puis copiez les 6 identifiants `price_…` dans les variables `STRIPE_PRICE_…` de `.env.example`. L'essai de 7 jours sur Plus est géré par l'application, inutile de le configurer dans Stripe.
+
+Dans **Paramètres → Billing → Portail client**, autorisez le **changement de formule** entre les 3 produits et leurs 6 prix : c'est là que vos abonnés passeront d'Essentiel à Plus, de mensuel à annuel, etc.
 
 ### 2. Importer le projet dans Vercel
 
@@ -89,9 +102,9 @@ Les tests de bout en bout utilisent une base séparée (`TEST_DATABASE_URL`, par
 
 ## Coûts à prévoir
 
-- **Claude** (`claude-opus-5-5`, effort bas) : environ 1 centime par réponse au début d'une conversation, un peu plus quand l'historique s'allonge. Le modèle se change avec `CLAUDE_MODEL`.
+- **Claude** : environ 0,02 centime par réplique avec Haiku (Gratuit, Essentiel), 0,4 centime avec Sonnet (Plus), 0,75 centime avec Opus (Premium). Les modèles se changent avec `MODEL_FREE`, `MODEL_ESSENTIAL`, `MODEL_PLUS`, `MODEL_PREMIUM`.
 - **Voix** : facturée à la minute par OpenAI, réservée aux abonnés.
-- Les limites quotidiennes (`FREE_DAILY_REPLIES`, `PRO_DAILY_REPLIES`) protègent votre budget.
+- Les limites quotidiennes (`FREE_DAILY_REPLIES`, `ESSENTIAL_DAILY_REPLIES`, `PLUS_DAILY_REPLIES`, `PREMIUM_DAILY_REPLIES`) protègent votre budget.
 
 En cas de refus par un filtre de sécurité, l'API réessaie automatiquement sur le modèle recommandé (`fallbacks: "default"`).
 

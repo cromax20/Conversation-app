@@ -1,5 +1,5 @@
 import { prisma } from "./db";
-import { isPro, startOfUtcDay, type PlanUser } from "./plan";
+import { features, tierOf, startOfUtcDay, type PlanUser } from "./plan";
 import { limits } from "./cards";
 
 export type CardsUsage = { pro: boolean; cards: number; quizzes: number; decks: number; limits: ReturnType<typeof limits> };
@@ -9,7 +9,7 @@ export async function cardsUsage(userId: string, user: PlanUser): Promise<CardsU
   const since = startOfUtcDay();
   const count = (kind: string) => prisma.usageEvent.count({ where: { userId, kind, createdAt: { gte: since } } });
   const [cards, quizzes, decks] = await Promise.all([count("card"), count("quiz"), count("deck")]);
-  return { pro: isPro(user), cards, quizzes, decks, limits: limits() };
+  return { pro: features(tierOf(user)).unlimitedCards, cards, quizzes, decks, limits: limits() };
 }
 
 export function over(u: CardsUsage, kind: "cards" | "quizzes" | "decks") {

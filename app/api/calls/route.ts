@@ -2,7 +2,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { currentUser } from "@/lib/session";
 import { jsonError, unauthorized } from "@/lib/http";
-import { canCall } from "@/lib/calls";
+import { accessFor } from "@/lib/calls-server";
 import { parseAvatar } from "@/lib/avatar";
 import { CUSTOM, LEVEL_ORDER, MAX_FIELD_LENGTH, buildCallPrompt, type Level } from "@/lib/characters";
 
@@ -25,7 +25,9 @@ export async function POST(req: Request) {
 
   const progress = await prisma.languageProgress.findUnique({ where: { userId_key: { userId: user.id, key: b.key } } });
   if (!progress) return jsonError(404, "not_found", "Langue introuvable.");
-  if (!canCall(user, progress)) return jsonError(403, "call_locked", "Appel vidéo verrouillé.");
+  const access = await accessFor(user.id, user, progress);
+  if (access === "locked") return jsonError(403, "call_locked", "Appel vidéo verrouillé.");
+  if (access === "weekly_used") return jsonError(429, "call_weekly_used", "Appel gratuit de la semaine déjà utilisé.");
 
   const isCustom = progress.key.startsWith("custom:");
   const lang = isCustom ? { language: CUSTOM, customLanguage: progress.languageName } : { language: progress.key };
@@ -49,5 +51,6 @@ export async function POST(req: Request) {
       systemPrompt: buildCallPrompt({ ...lang, level, nativeLang, name: b.name, age: b.age, place: b.place, topic: b.topic }),
     },
   });
+  if (access === "weekly") await prisma.usageEvent.create({ data: { userId: user.id, kind: "free_call" } });
   return Response.json({ id: conv.id }, { status: 201 });
 }

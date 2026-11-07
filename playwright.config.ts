@@ -17,6 +17,12 @@ const env = {
   FREE_DAILY_DECKS: "1",
   STRIPE_SECRET_KEY: "sk_test_e2e",
   STRIPE_WEBHOOK_SECRET: "whsec_e2e_secret",
+  STRIPE_PRICE_ESSENTIAL_MONTHLY: "price_ess_m",
+  STRIPE_PRICE_ESSENTIAL_YEARLY: "price_ess_y",
+  STRIPE_PRICE_PLUS_MONTHLY: "price_plus_m",
+  STRIPE_PRICE_PLUS_YEARLY: "price_plus_y",
+  STRIPE_PRICE_PREMIUM_MONTHLY: "price_prem_m",
+  STRIPE_PRICE_PREMIUM_YEARLY: "price_prem_y",
 };
 
 export default defineConfig({

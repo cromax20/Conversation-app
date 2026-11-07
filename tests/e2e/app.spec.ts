@@ -121,13 +121,13 @@ test("le webhook Stripe active et résilie l'abonnement", async ({ request }) =>
     const payload = JSON.stringify({
       id: "evt_test", object: "event", type: "customer.subscription.updated",
       data: { object: { id: "sub_test", object: "subscription", customer: user.stripeCustomerId, status, metadata: {},
-        items: { data: [{ current_period_end: Math.floor(Date.now() / 1000) + 30 * 86400 }] } } },
+        items: { data: [{ current_period_end: Math.floor(Date.now() / 1000) + 30 * 86400, price: { id: "price_prem_y" } }] } } },
     });
     const header = stripe.webhooks.generateTestHeaderString({ payload, secret: "whsec_e2e_secret" });
     return request.post("/api/stripe/webhook", { data: payload, headers: { "stripe-signature": header, "content-type": "application/json" } });
   };
   expect((await send("active")).status()).toBe(200);
-  expect((await db.user.findUniqueOrThrow({ where: { id: user.id } })).subscriptionStatus).toBe("active");
+  expect(await db.user.findUniqueOrThrow({ where: { id: user.id } })).toMatchObject({ subscriptionStatus: "active", plan: "premium" });
   expect((await send("canceled")).status()).toBe(200);
   expect((await db.user.findUniqueOrThrow({ where: { id: user.id } })).subscriptionStatus).toBe("canceled");
 
@@ -376,4 +376,72 @@ test("fond d'appel animé : scènes du pays qui changent", async ({ page, contex
   await expect(backdrop.locator(".scene-layer")).toHaveCount(3);
   await expect(backdrop.locator(".ambience")).toHaveCount(1);
   await expect(backdrop).toHaveAttribute("data-scene", "1", { timeout: 20000 });
+});
+
+test("page Tarifs : 3 formules, mensuel ou annuel, essai sur Plus", async ({ page }) => {
+  await page.goto("/abonnement");
+  await expect(page.getByRole("heading", { name: "Choisissez votre formule" })).toBeVisible();
+  await expect(page.getByTestId("tier-plus")).toContainText("Le plus choisi");
+  await expect(page.getByTestId("tier-plus")).toContainText("129");
+  await expect(page.getByTestId("tier-plus")).toContainText("7 jours d'essai gratuit");
+  await page.getByRole("radio", { name: "Mensuel" }).click();
+  await expect(page.getByTestId("tier-essential")).toContainText("7,99");
+  await expect(page.getByTestId("tier-plus")).toContainText("12,99");
+  await expect(page.getByTestId("tier-premium")).toContainText("19,99");
+  await expect(page.getByTestId("tier-premium")).toContainText("150 répliques par jour");
+  await page.getByLabel("Langue du site").selectOption("en");
+  await expect(page.getByTestId("tier-premium")).toContainText("€19.99");
+});
+
+test("Essentiel : cartes illimitées mais pas de voix ni d'appel ; Premium : tout", async ({ page, context, browser }) => {
+  const ess = await signIn(context, { plan: "essential" });
+  await db.languageProgress.create({ data: { userId: ess.id, key: "es", languageName: "Espagnol", level: "A2", startLevel: "A2" } });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Commencer la conversation" }).click();
+  await expect(page.locator(".msg.ai").first()).toBeVisible();
+  await expect(page.getByRole("button", { name: "Dicter votre réponse" })).toHaveCount(0);
+  await expect(page.getByTestId("remaining")).toContainText("99 réponses restantes");
+  await page.goto("/cartes");
+  await expect(page.getByTestId("limits")).toContainText("illimités");
+  await page.goto("/appel/nouveau?key=es");
+  await expect(page.getByRole("heading", { name: /Appel vidéo verrouillé/ })).toBeVisible();
+  await page.goto("/abonnement");
+  await expect(page.getByTestId("current-plan")).toContainText("Essentiel");
+
+  const ctx2 = await browser.newContext({ locale: "fr-FR" });
+  const prem = await signIn(ctx2, { plan: "premium" });
+  const page2 = await ctx2.newPage();
+  await page2.goto("/");
+  await page2.getByRole("button", { name: "Commencer la conversation" }).click();
+  await expect(page2.locator(".msg.ai").first()).toBeVisible();
+  await expect(page2.getByRole("button", { name: "Dicter votre réponse" })).toBeVisible();
+  await expect(page2.getByTestId("remaining")).toContainText("149 réponses restantes");
+  expect(prem.id).toBeTruthy();
+  await ctx2.close();
+});
+
+test("appel gratuit hebdomadaire au niveau B2 : 1 par semaine, 10 minutes", async ({ page, context }) => {
+  const user = await signIn(context);
+  await db.languageProgress.create({ data: { userId: user.id, key: "it", languageName: "Italien", level: "B2", startLevel: "B1", examsPassed: 1 } });
+  await page.goto("/appel/nouveau?key=it");
+  await expect(page.getByTestId("weekly-call")).toContainText("10 min");
+  await page.getByRole("button", { name: /Appeler/ }).click();
+  await expect(page).toHaveURL(/\/appel\/c/);
+  await expect(page.getByTestId("call-left")).toContainText(/9:5\d|10:00/);
+  const avatar = { skin: 0, hairStyle: "short", hairColor: "black", eyes: "brown", beard: "none", glasses: false, earrings: false, outfit: 0, scenery: "country", time: "day", voice: "coral" };
+  const again = await page.request.post("/api/calls", { data: { key: "it", name: "Giulia", age: 30, place: "", topic: "", avatar } });
+  expect(again.status()).toBe(429);
+  // Après 10 minutes, l'appel gratuit se ferme.
+  const conv = await db.conversation.findFirstOrThrow({ where: { userId: user.id, mode: "call" } });
+  await db.conversation.update({ where: { id: conv.id }, data: { createdAt: new Date(Date.now() - 11 * 60_000) } });
+  expect((await page.request.post(`/api/conversations/${conv.id}/reply`, { data: {} })).status()).toBe(403);
+  await page.goto(`/appel/${conv.id}`);
+  await expect(page.getByText("Votre appel gratuit de la semaine est terminé")).toBeVisible();
+});
+
+test("paiement : formule ou période invalide refusée", async ({ page, context }) => {
+  await signIn(context);
+  await page.goto("/");
+  expect((await page.request.post("/api/billing/checkout", { data: { tier: "gold", interval: "month" } })).status()).toBe(400);
+  expect((await page.request.post("/api/billing/checkout", { data: { tier: "plus", interval: "week" } })).status()).toBe(400);
 });

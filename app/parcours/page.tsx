@@ -2,8 +2,9 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { currentUser } from "@/lib/session";
-import { isPro } from "@/lib/plan";
-import { callFreeLevel, freeCallUnlocked } from "@/lib/calls";
+import { features, tierOf } from "@/lib/plan";
+import { callFreeLevel } from "@/lib/calls";
+import { accessFor } from "@/lib/calls-server";
 import { nextLevel, palierInfo, currentStreak, PALIERS_PER_LEVEL } from "@/lib/progress";
 import { buildPath } from "@/lib/path";
 import { themeFor } from "@/lib/themes";
@@ -22,7 +23,7 @@ export default async function PathPage({ searchParams }: { searchParams: Promise
 
   const all = await prisma.languageProgress.findMany({ where: { userId: user.id }, orderBy: { updatedAt: "desc" } });
   const streak = currentStreak(user);
-  const pro = isPro(user);
+  const pro = features(tierOf(user)).calls;
 
   if (all.length === 0) {
     return (
@@ -38,7 +39,7 @@ export default async function PathPage({ searchParams }: { searchParams: Promise
   const code = p.key.startsWith("custom:") ? "custom" : p.key;
   const theme = themeFor(code);
   const callLevel = callFreeLevel();
-  const callOk = pro || freeCallUnlocked(p);
+  const callOk = (await accessFor(user.id, user, p)) !== "locked";
   const nodes = buildPath(p, [...theme.landmarks, ...theme.dishes], callLevel, callOk);
   const info = palierInfo(p.xp);
   const label = (k: string, name: string) => storedLanguageLabel(k.startsWith("custom:") ? "custom" : k, name, locale);

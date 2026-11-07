@@ -1,8 +1,9 @@
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { currentUser } from "@/lib/session";
-import { isPro } from "@/lib/plan";
+import { features, tierOf } from "@/lib/plan";
 import { freeCallUnlocked } from "@/lib/calls";
+import { voiceAllowed } from "@/lib/calls-server";
 import { synthesize, voiceEnabled } from "@/lib/voice";
 
 import { jsonError, notFound, unauthorized } from "@/lib/http";
@@ -13,7 +14,7 @@ const PREVIEW_TEXT = "Bonjour ! Voici ma voix. Hello! This is my voice.";
 export async function POST(req: Request) {
   const user = await currentUser();
   if (!user) return unauthorized();
-  const pro = isPro(user);
+  const pro = features(tierOf(user)).voice;
   if (!voiceEnabled()) return jsonError(503, "voice_unavailable", "La voix n'est pas configurée.");
 
   const parsed = z.object({ messageId: z.string().optional(), preview: z.object({ voice: z.string(), language: z.string() }).optional() }).safeParse(await req.json().catch(() => null));
@@ -39,13 +40,8 @@ export async function POST(req: Request) {
     include: { conversation: true },
   });
   if (!msg) return notFound();
-  if (!pro) {
-    // Sans abonnement, la voix n'est disponible que pendant un appel débloqué par le niveau.
-    const progress = msg.conversation.mode === "call"
-      ? await prisma.languageProgress.findUnique({ where: { userId_key: { userId: user.id, key: msg.conversation.progressKey } } })
-      : null;
-    if (!freeCallUnlocked(progress)) return jsonError(402, "pro_only", "La voix est réservée aux abonnés.");
-  }
+  // Sans formule avec voix, seulement pendant un appel gratuit encore ouvert.
+  if (!(await voiceAllowed(user.id, user, msg.conversation))) return jsonError(402, "pro_only", "La voix est réservée aux formules Plus et Premium.");
 
   try {
     const audio = await synthesize({

@@ -71,7 +71,7 @@ describe("réglages et consigne", () => {
 });
 
 import { splitExpression, buildCallPrompt } from "@/lib/characters";
-import { canCall, freeCallUnlocked } from "@/lib/calls";
+import { callAccess, freeCallUnlocked } from "@/lib/calls";
 import { buildPath } from "@/lib/path";
 import { themeFor } from "@/lib/themes";
 import { parseAvatar, DEFAULT_AVATAR } from "@/lib/avatar";
@@ -97,8 +97,8 @@ describe("appel vidéo", () => {
     expect(freeCallUnlocked({ level: "C1", examsPassed: 1 })).toBe(true);
     const free = { subscriptionStatus: null, currentPeriodEnd: null };
     const pro = { subscriptionStatus: "active", currentPeriodEnd: null };
-    expect(canCall(free, { level: "A1", examsPassed: 0 })).toBe(false);
-    expect(canCall(pro, { level: "A1", examsPassed: 0 })).toBe(true);
+    expect(callAccess(free, { level: "A1", examsPassed: 0 }, null)).toBe("locked");
+    expect(callAccess(pro, { level: "A1", examsPassed: 0 }, null)).toBe("plan");
   });
   it("valide l'apparence envoyée par le navigateur", () => {
     expect(parseAvatar(DEFAULT_AVATAR)).toEqual(DEFAULT_AVATAR);

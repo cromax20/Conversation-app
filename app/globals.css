@@ -367,3 +367,25 @@ body{background:
 .logo{width:30px;height:30px;border-radius:10px;display:grid;place-items:center;font-size:16px;background:linear-gradient(135deg,#4b2bd8,#ff5f8f)}
 .tagline{display:none;font:500 13px var(--body);color:var(--muted);margin-inline-start:4px}
 @media (min-width:760px){.tagline{display:inline}}
+
+/* ---- Tarifs ---- */
+.pricing{max-width:1100px}
+.billing-toggle{justify-self:center;display:inline-flex;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:4px;gap:4px}
+.billing-toggle button{font:600 15px var(--body);border:0;background:none;color:var(--ink);border-radius:999px;padding:8px 16px;cursor:pointer}
+.billing-toggle button[aria-checked="true"]{background:linear-gradient(90deg,#4b2bd8,#9a37e8);color:#fff}
+.save{font-size:12px;font-weight:700;background:#ffb347;color:#3a2000;border-radius:999px;padding:1px 7px;margin-inline-start:4px}
+.tiers{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px;align-items:stretch}
+.tier{position:relative;background:var(--card);border:1px solid var(--line);border-radius:20px;padding:20px;display:grid;gap:8px;align-content:start;grid-template-rows:auto auto auto auto auto 1fr auto}
+.tier h2{margin:0;font-size:24px}
+.tier .price{font:700 32px var(--body)}
+.tier .per{font-size:15px;font-weight:500;color:var(--muted)}
+.tier ul{margin:4px 0 0;padding-inline-start:18px;color:var(--muted);font-size:14px;display:grid;gap:4px}
+.tier.featured{border:2px solid transparent;background:linear-gradient(var(--card),var(--card)) padding-box,linear-gradient(135deg,#4b2bd8,#ff5f8f) border-box;box-shadow:0 24px 40px -24px rgba(75,43,216,.6)}
+@media (min-width:980px){.tier.featured{transform:translateY(-8px)}}
+.tier.current{outline:2px solid var(--ok);outline-offset:2px}
+.tier-premium h2{background:linear-gradient(90deg,#c08a1e,#e0b84a);-webkit-background-clip:text;background-clip:text;color:transparent}
+.ribbon{position:absolute;top:-12px;inset-inline-end:16px;background:linear-gradient(90deg,#ff7a59,#ff3d81);color:#fff;font:700 12px var(--body);border-radius:999px;padding:4px 10px}
+.trial-badge{justify-self:start;font:600 13px var(--body);background:color-mix(in srgb,#30a46c 15%,var(--card));color:var(--ok);border-radius:999px;padding:3px 10px}
+.tier-cta{display:grid;margin-top:8px}
+.tier-cta .btn,.tier-cta .ghost{text-align:center}
+.call-left{color:#ffd36b}

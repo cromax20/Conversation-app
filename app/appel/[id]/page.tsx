@@ -2,7 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { currentUser } from "@/lib/session";
-import { canCall } from "@/lib/calls";
+import { freeCallActive, freeCallMinutes, freeCallUnlocked } from "@/lib/calls";
 import { quotaFor } from "@/lib/plan";
 import { DEFAULT_AVATAR, parseAvatar } from "@/lib/avatar";
 import { getI18n } from "@/i18n/server";
@@ -22,10 +22,22 @@ export default async function CallPage({ params }: { params: Promise<{ id: strin
   });
   if (!conv) notFound();
   const progress = await prisma.languageProgress.findUnique({ where: { userId_key: { userId: user.id, key: conv.progressKey } } });
-  if (!canCall(user, progress)) redirect(`/appel/nouveau?key=${encodeURIComponent(conv.progressKey)}`);
+  const quota = await quotaFor(user.id, user);
+  const planCalls = quota.features.calls;
+  if (!planCalls && !freeCallUnlocked(progress)) redirect(`/appel/nouveau?key=${encodeURIComponent(conv.progressKey)}`);
+  // Appel gratuit : 10 minutes à partir de sa création.
+  if (!planCalls && !freeCallActive(conv)) {
+    return (
+      <main className="wrap">
+        <h1>📵 {t.call.ended}</h1>
+        <p className="lede">{t.errors.call_time_up}</p>
+        <p><Link className="btn" href="/abonnement">{t.chat.seePlan}</Link> <Link className="ghost" href="/parcours">{t.call.back}</Link></p>
+      </main>
+    );
+  }
+  const endsAt = planCalls ? null : conv.createdAt.getTime() + freeCallMinutes() * 60_000;
 
   const c = conv.character as { name: string; age: number; avatar?: unknown };
-  const quota = await quotaFor(user.id, user);
 
   return (
     <main className="wrap call-wrap">
@@ -39,6 +51,7 @@ export default async function CallPage({ params }: { params: Promise<{ id: strin
         languageLabel={storedLanguageLabel(conv.language, conv.languageName, locale)}
         initialMessages={conv.messages.map((m) => ({ id: m.id, role: m.role as "user" | "assistant", text: m.text }))}
         remaining={quota.remaining}
+        endsAt={endsAt}
         theme={themeFor(conv.progressKey.startsWith("custom:") ? "custom" : conv.progressKey)}
       />
       <p className="muted small" style={{ margin: 0, textAlign: "center" }}>{t.chat.remaining(quota.remaining)} · {t.call.illustrated}</p>
