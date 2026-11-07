@@ -12,7 +12,7 @@
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "postinstall": "prisma generate",
-    "vercel-build": "prisma generate && prisma migrate deploy && next build"
+    "vercel-build": "node scripts/vercel-build.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.6.0",
