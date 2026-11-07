@@ -12,6 +12,9 @@ const env = {
   MOCK_AI: "1",
   E2E: "1",
   FREE_DAILY_REPLIES: "4",
+  FREE_DAILY_CARDS: "3",
+  FREE_DAILY_QUIZZES: "1",
+  FREE_DAILY_DECKS: "1",
   STRIPE_SECRET_KEY: "sk_test_e2e",
   STRIPE_WEBHOOK_SECRET: "whsec_e2e_secret",
 };

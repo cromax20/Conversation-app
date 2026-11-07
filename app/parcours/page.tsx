@@ -64,6 +64,8 @@ export default async function PathPage({ searchParams }: { searchParams: Promise
         </nav>
       )}
 
+      <Link className="ghost" href={`/cartes?lang=${encodeURIComponent(p.key)}`}>🃏 {t.cards.nav}</Link>
+
       {pro && (
         <Link className="callbanner" href={`/appel/nouveau?key=${encodeURIComponent(p.key)}`}>📹 {t.path.callReady}</Link>
       )}

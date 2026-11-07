@@ -6,13 +6,14 @@ import type { Avatar } from "@/lib/avatar";
 import { splitExpression, type Expression } from "@/lib/characters";
 import { useI18n } from "@/i18n/client";
 import AvatarFace from "./AvatarFace";
-import Scenery from "./Scenery";
+import CountryBackdrop from "./CountryBackdrop";
+import type { Theme } from "@/lib/themes";
 import { useWrittenMode } from "@/lib/useWrittenMode";
 
 type Msg = { id: string; role: "user" | "assistant"; text: string };
 type Props = {
   conversationId: string; progressKey: string; name: string; age: number; avatar: Avatar; languageLabel: string;
-  initialMessages: Msg[]; remaining: number;
+  initialMessages: Msg[]; remaining: number; theme: Theme;
 };
 
 export default function CallRoom(p: Props) {
@@ -190,7 +191,7 @@ export default function CallRoom(p: Props) {
 
   return (
     <div className="callroom" data-testid="callroom" data-expression={expression} data-status={status}>
-      <Scenery className="call-bg" scenery={p.avatar.scenery} time={p.avatar.time} />
+      <CountryBackdrop className="call-bg" theme={p.theme} scenery={p.avatar.scenery} time={p.avatar.time} />
       <div className="call-top">
         <span><b>{p.name}</b> · {p.languageLabel}</span>
         <span className="call-timer">{phase === "active" ? t.call.duration(mm, ss) : ""}</span>

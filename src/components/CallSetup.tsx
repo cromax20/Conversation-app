@@ -8,11 +8,12 @@ import {
 import { MAX_FIELD_LENGTH } from "@/lib/characters";
 import { useI18n } from "@/i18n/client";
 import AvatarFace from "./AvatarFace";
-import Scenery from "./Scenery";
+import CountryBackdrop from "./CountryBackdrop";
+import type { Theme } from "@/lib/themes";
 
-type Props = { progressKey: string; languageLabel: string; defaults: { avatar: Avatar; name: string; place: string } };
+type Props = { progressKey: string; languageLabel: string; theme: Theme; defaults: { avatar: Avatar; name: string; place: string } };
 
-export default function CallSetup({ progressKey, languageLabel, defaults }: Props) {
+export default function CallSetup({ progressKey, languageLabel, theme, defaults }: Props) {
   const { t } = useI18n();
   const o = t.call.options;
   const router = useRouter();
@@ -56,7 +57,7 @@ export default function CallSetup({ progressKey, languageLabel, defaults }: Prop
   return (
     <div className="setup">
       <div className="setup-preview">
-        <Scenery className="setup-bg" scenery={avatar.scenery} time={avatar.time} />
+        <CountryBackdrop className="setup-bg" theme={theme} scenery={avatar.scenery} time={avatar.time} interval={6000} />
         <AvatarFace className="setup-face" avatar={avatar} expression="sourire" age={age} />
         <span className="setup-name">{name || "…"} · {languageLabel}</span>
       </div>

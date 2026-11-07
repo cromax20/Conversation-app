@@ -6,7 +6,11 @@ test.afterAll(async () => { await db.$disconnect(); });
 
 test("un visiteur voit le générateur et doit se connecter pour discuter", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("heading", { level: 1, name: "Atelier de personnages" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Parlez une nouvelle langue, pour de vrai." })).toBeVisible();
+  // Un « bonjour » flottant choisit la langue.
+  await page.getByRole("button", { name: "Azul", exact: true }).click({ force: true }); // la bulle flotte en continu
+  await expect(page.getByLabel("Langue ou dialecte")).toHaveValue("kab");
+  await expect(page.locator(".speech")).toContainText("Azul");
   await expect(page.locator(".who")).toContainText("ans");
   await expect(page.getByRole("button", { name: "💬 Discussion libre" })).toHaveAttribute("aria-pressed", "true");
   await page.getByRole("button", { name: "Se connecter pour commencer" }).click();
@@ -146,16 +150,16 @@ test("la connexion par e-mail envoie un lien magique", async ({ page }) => {
 
 test("la langue du site se change à tout moment (y compris l'arabe, de droite à gauche)", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Atelier de personnages");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Parlez une nouvelle langue, pour de vrai.");
   await page.getByLabel("Langue du site").selectOption("en");
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Character Workshop");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Speak a new language, for real.");
   await expect(page.getByRole("link", { name: "Sign in" })).toBeVisible();
   await expect(page.getByLabel("Language or dialect")).toContainText("Japanese");
   await page.getByLabel("Site language").selectOption("ar");
   await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("ورشة الشخصيات");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("تحدّث لغة جديدة، بحق.");
   await page.reload();
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("ورشة الشخصيات");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("تحدّث لغة جديدة، بحق.");
   await page.getByLabel("لغة الموقع").selectOption("fr");
   await expect(page.locator("html")).toHaveAttribute("dir", "ltr");
 });
@@ -293,4 +297,80 @@ test("mode écrit : pas de micro ni de son, l'appel se fait par écrit", async (
   await page.getByPlaceholder("Votre réponse…").fill("Hello");
   await page.getByRole("button", { name: "Envoyer" }).click();
   await expect(page.getByTestId("subtitle")).toContainText("Réponse simulée");
+});
+
+test("cartes et quiz : paquet, révision, quiz, XP et limites de la version gratuite", async ({ page, context }) => {
+  const user = await signIn(context);
+  await db.languageProgress.create({ data: { userId: user.id, key: "es", languageName: "Espagnol", level: "A2", startLevel: "A2" } });
+  await page.goto("/cartes");
+  await expect(page.getByTestId("limits")).toContainText("3 cartes, 1 quiz et 1 nouveaux paquets par jour");
+
+  // Créer un paquet (1 par jour en gratuit).
+  await page.getByTestId("deck-food").getByRole("button", { name: "Créer le paquet" }).click();
+  await expect(page.getByTestId("deck-food")).toContainText("10 cartes");
+  await page.getByTestId("deck-travel").getByRole("button", { name: "Créer le paquet" }).click();
+  await expect(page.locator(".msg.note")).toContainText("paquets gratuits du jour");
+
+  // Réviser : retourner la carte, puis répondre (3 cartes par jour en gratuit).
+  await page.getByTestId("deck-food").getByRole("button", { name: /Réviser · 10 à revoir/ }).click();
+  await expect(page.getByTestId("flashcard")).toContainText("Palabra 1");
+  await expect(page.getByRole("button", { name: "✅ Je savais" })).toBeDisabled();
+  await page.getByTestId("flashcard").click();
+  await page.getByRole("button", { name: "✅ Je savais" }).click();
+  await page.getByTestId("flashcard").click();
+  await page.getByRole("button", { name: "🔁 À revoir" }).click();
+  await page.getByTestId("flashcard").click();
+  await page.getByRole("button", { name: "✅ Je savais" }).click();
+  await page.getByTestId("flashcard").click();
+  await page.getByRole("button", { name: "✅ Je savais" }).click();
+  await expect(page.locator(".msg.note")).toContainText("cartes gratuites du jour");
+  const reviews = await db.cardReview.findMany({ where: { deck: { userId: user.id } }, orderBy: { index: "asc" } });
+  expect(reviews.map((r) => r.box)).toEqual([2, 1, 2]);
+
+  // Quiz : 10 questions, +2 XP par bonne réponse, 1 quiz par jour en gratuit.
+  await page.getByRole("button", { name: /Lancer un quiz/ }).click();
+  for (let i = 0; i < 10; i++) {
+    await expect(page.getByTestId("quiz")).toContainText(`Question ${i + 1}/10`);
+    const prompt = (await page.locator(".quiz-prompt b").textContent())!;
+    const n = prompt.match(/\d+/)![0];
+    const target = prompt.startsWith("Palabra") ? `Mot ${n}` : `Palabra ${n}`;
+    await page.locator(".option", { hasText: new RegExp(`^${target}$`) }).click();
+    await page.getByRole("button", { name: "Suivant" }).click();
+  }
+  await expect(page.getByTestId("quiz-result")).toContainText("10/10 bonnes réponses · +20 XP");
+  const p = await db.languageProgress.findUniqueOrThrow({ where: { userId_key: { userId: user.id, key: "es" } } });
+  expect(p.xp).toBe(20);
+  await page.getByRole("button", { name: "Fermer" }).click();
+  await page.getByRole("button", { name: /Lancer un quiz/ }).click();
+  await expect(page.locator(".msg.note")).toContainText("quiz gratuits du jour");
+  // Terminer un quiz jamais commencé ne rapporte rien.
+  expect((await page.request.post("/api/quiz/finish", { data: { key: "es", correct: 10 } })).status()).toBe(409);
+});
+
+test("cartes et quiz illimités pour les abonnés", async ({ page, context }) => {
+  const user = await signIn(context, { pro: true });
+  await db.languageProgress.create({ data: { userId: user.id, key: "ja", languageName: "Japonais", level: "A1", startLevel: "A1" } });
+  await page.goto("/cartes");
+  await expect(page.getByTestId("limits")).toContainText("Cartes et quiz illimités");
+  for (const topic of ["food", "travel"]) {
+    await page.getByTestId(`deck-${topic}`).getByRole("button", { name: "Créer le paquet" }).click();
+    await expect(page.getByTestId(`deck-${topic}`)).toContainText("10 cartes");
+  }
+  for (let i = 0; i < 2; i++) {
+    await page.getByRole("button", { name: /Lancer un quiz/ }).click();
+    await expect(page.getByTestId("quiz")).toBeVisible();
+    await page.getByRole("button", { name: "Fermer" }).click();
+  }
+});
+
+test("fond d'appel animé : scènes du pays qui changent", async ({ page, context }) => {
+  const user = await signIn(context, { pro: true });
+  await db.languageProgress.create({ data: { userId: user.id, key: "ja", languageName: "Japonais", level: "A1", startLevel: "A1" } });
+  await page.goto("/appel/nouveau?key=ja");
+  await expect(page.getByLabel("Paysage")).toHaveValue("country");
+  await page.getByRole("button", { name: /Appeler/ }).click();
+  const backdrop = page.locator(".call-bg");
+  await expect(backdrop.locator(".scene-layer")).toHaveCount(3);
+  await expect(backdrop.locator(".ambience")).toHaveCount(1);
+  await expect(backdrop).toHaveAttribute("data-scene", "1", { timeout: 20000 });
 });

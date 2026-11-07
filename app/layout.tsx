@@ -32,6 +32,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               {session?.user ? (
                 <>
                   <Link href="/parcours">{t.nav.path}</Link>
+                  <Link href="/cartes">{t.cards.nav}</Link>
                   <Link href="/conversations">{t.nav.conversations}</Link>
                   <Link href="/abonnement">{t.nav.subscription}</Link>
                   <form action={async () => { "use server"; await signOut({ redirectTo: "/" }); }}>

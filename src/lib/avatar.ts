@@ -6,7 +6,7 @@ export const HAIR_COLORS = { black: "#1d1a19", brown: "#3d2618", chestnut: "#6b4
 export const EYE_COLORS = { brown: "#5a3a22", dark: "#21160f", hazel: "#7d5b2d", green: "#4f7a4a", blue: "#4a76a8", grey: "#77818a" } as const;
 export const BEARDS = ["none", "stubble", "full", "moustache"] as const;
 export const OUTFITS = ["#2a4fbf", "#c8412e", "#1f7a4d", "#7a3fb0", "#e0a43a", "#2b2f3a", "#e8e6e1", "#0f8a8a"];
-export const SCENERIES = ["mountains", "sea", "desert", "city", "countryside", "tropical", "snow", "village"] as const;
+export const SCENERIES = ["country", "mountains", "sea", "desert", "city", "countryside", "tropical", "snow", "village"] as const;
 export const TIMES = ["morning", "day", "sunset", "night"] as const;
 export const VOICES = ["alloy", "ash", "ballad", "coral", "echo", "sage", "shimmer", "verse"] as const;
 export const HEADSCARF_COLORS = ["#7a3fb0", "#1f7a4d", "#c8412e", "#2a4fbf", "#e0a43a", "#2b2f3a"];
@@ -27,10 +27,10 @@ export type Avatar = {
 
 export const DEFAULT_AVATAR: Avatar = {
   skin: 2, hairStyle: "short", hairColor: "brown", eyes: "brown", beard: "none", glasses: false, earrings: false,
-  outfit: 0, scenery: "village", time: "day", voice: "coral",
+  outfit: 0, scenery: "country", time: "day", voice: "coral",
 };
 
-export function defaultSceneryFor(region: string | undefined): Avatar["scenery"] {
+export function defaultSceneryFor(region: string | undefined): Exclude<Avatar["scenery"], "country"> {
   switch (region) {
     case "Afrique": return "desert";
     case "Asie": return "mountains";
@@ -54,4 +54,26 @@ export function parseAvatar(v: unknown): Avatar | null {
     Number.isInteger(a.outfit) && (a.outfit as number) >= 0 && (a.outfit as number) < OUTFITS.length &&
     oneOf(SCENERIES, a.scenery) && oneOf(TIMES, a.time) && oneOf(VOICES, a.voice);
   return ok ? (a as unknown as Avatar) : null;
+}
+
+/** Apparence stable tirée d'une graine (ex. prénom + ville) pour les personnages des conversations. */
+export function avatarFromSeed(seed: string): Avatar {
+  let h = 2166136261;
+  for (const ch of seed) { h ^= ch.codePointAt(0)!; h = Math.imul(h, 16777619) >>> 0; }
+  const pick = <T,>(list: readonly T[], shift: number) => list[(h >>> shift) % list.length];
+  const styles = HAIR_STYLES.filter((s) => s !== "headscarf");
+  const beardRoll = (h >>> 20) % 5;
+  return {
+    skin: (h >>> 1) % SKIN_TONES.length,
+    hairStyle: pick(styles, 4),
+    hairColor: pick(["black", "brown", "chestnut", "blond", "red", "grey"] as const, 8),
+    eyes: pick(Object.keys(EYE_COLORS) as (keyof typeof EYE_COLORS)[], 12),
+    beard: beardRoll === 0 ? "stubble" : beardRoll === 1 ? "moustache" : "none",
+    glasses: (h >>> 16) % 4 === 0,
+    earrings: (h >>> 18) % 3 === 0,
+    outfit: (h >>> 22) % OUTFITS.length,
+    scenery: "country",
+    time: "day",
+    voice: pick(VOICES, 26),
+  };
 }

@@ -1,18 +1,21 @@
 // Thème d'immersion de chaque langue pour le parcours : paysage, couleurs, monuments et plats.
 import type { Avatar } from "./avatar";
 import { languageByCode } from "./characters";
+import type { SilhouetteKind } from "@/components/Silhouette";
 
 export type Sticker = { emoji: string; label: string };
 export type Theme = {
-  scenery: Avatar["scenery"];
+  scenery: Exclude<Avatar["scenery"], "country">;
   time: Avatar["time"];
   colors: [string, string, string]; // couleurs principales (inspirées du drapeau ou de la culture)
   landmarks: Sticker[];
   dishes: Sticker[];
+  silhouettes: SilhouetteKind[]; // monuments dessinés au fond des appels et du parcours
+  greeting?: string; // « bonjour » dans la langue
 };
 
 const T = (scenery: Theme["scenery"], time: Theme["time"], colors: Theme["colors"], landmarks: string, dishes: string): Theme => ({
-  scenery, time, colors,
+  scenery, time, colors, silhouettes: [],
   landmarks: landmarks.split(";").map((x) => { const [emoji, label] = x.split("|"); return { emoji, label }; }),
   dishes: dishes.split(";").map((x) => { const [emoji, label] = x.split("|"); return { emoji, label }; }),
 });
@@ -85,7 +88,51 @@ const REGION_THEMES: Record<string, Theme> = {
   Monde: T("city", "day", ["#2a4fbf", "#e0a43a", "#c8412e"], "🗺️|Carte;🏙️|Ville;🌉|Pont;🏛️|Musée", "🍲|Plat local;🥖|Pain;🍵|Boisson;🍰|Dessert"),
 };
 
+const SIL: Record<string, SilhouetteKind[]> = {
+  es: ["cathedral", "palace", "castle"], "es-MX": ["pyramids", "volcano", "cathedral"], "es-AR": ["fuji", "skyline", "statue"], "es-CU": ["lighthouse", "palace", "skyline"],
+  fr: ["eiffel", "castle", "cathedral"], en: ["clocktower", "statue", "castle"], de: ["castle", "cathedral", "windmill"], it: ["colosseum", "cathedral", "clocktower"],
+  scn: ["volcano", "colosseum", "cathedral"], nap: ["volcano", "colosseum", "lighthouse"], pt: ["lighthouse", "castle", "palace"], "pt-BR": ["redeemer", "skyline", "lighthouse"],
+  ar: ["mosque", "palace", "pyramids"], ary: ["mosque", "palace", "castle"], arq: ["mosque", "cathedral", "palace"], aeb: ["mosque", "colosseum", "lighthouse"],
+  arz: ["pyramids", "mosque", "stupa"], apc: ["mosque", "colosseum", "skyline"], afb: ["skyline", "mosque", "palace"], kab: ["fuji", "castle", "mosque"],
+  shi: ["castle", "mosque", "palace"], tzm: ["castle", "mosque", "fuji"], wo: ["statue", "baobab", "lighthouse"], sw: ["fuji", "baobab", "lighthouse"],
+  yo: ["skyline", "baobab", "palace"], pcm: ["skyline", "baobab", "lighthouse"], ht: ["castle", "lighthouse", "cathedral"], gcf: ["volcano", "lighthouse", "windmill"],
+  rcf: ["volcano", "fuji", "lighthouse"], zh: ["pagoda", "palace", "fuji"], yue: ["skyline", "pagoda", "lighthouse"], ja: ["fuji", "torii", "pagoda"],
+  ko: ["palace", "skyline", "pagoda"], hi: ["palace", "mosque", "stupa"], ta: ["stupa", "palace", "lighthouse"], ru: ["onion", "palace", "cathedral"],
+  uk: ["onion", "cathedral", "windmill"], tr: ["mosque", "onion", "lighthouse"], el: ["colosseum", "palace", "windmill"], fa: ["mosque", "palace", "fuji"],
+  he: ["castle", "mosque", "skyline"], vi: ["pagoda", "stupa", "fuji"], th: ["stupa", "pagoda", "palace"], id: ["stupa", "volcano", "pagoda"],
+  tl: ["fuji", "cathedral", "skyline"], ka: ["cathedral", "castle", "fuji"], hy: ["fuji", "cathedral", "castle"], qu: ["fuji", "pyramids", "cathedral"],
+  br: ["lighthouse", "cathedral", "windmill"], ca: ["cathedral", "palace", "lighthouse"], eu: ["skyline", "lighthouse", "cathedral"], "gsw-FR": ["cathedral", "castle", "windmill"],
+  co: ["castle", "lighthouse", "fuji"], pl: ["castle", "cathedral", "skyline"], nl: ["windmill", "skyline", "cathedral"], ga: ["castle", "lighthouse", "cathedral"],
+};
+const REGION_SIL: Record<string, SilhouetteKind[]> = {
+  Europe: ["castle", "cathedral", "windmill"], Afrique: ["baobab", "pyramids", "mosque"], "Amériques": ["pyramids", "volcano", "skyline"],
+  Asie: ["pagoda", "stupa", "fuji"], "Océanie": ["volcano", "lighthouse", "baobab"], Monde: ["skyline", "lighthouse", "castle"],
+};
+const GREETINGS: Record<string, string> = {
+  en: "Hello", zh: "你好", hi: "नमस्ते", es: "¡Hola!", ar: "مرحبا", fr: "Bonjour", bn: "নমস্কার", pt: "Olá", ru: "Привет", id: "Halo", ur: "سلام", de: "Hallo",
+  ja: "こんにちは", pcm: "How far?", mr: "नमस्कार", vi: "Xin chào", te: "నమస్తే", ha: "Sannu", tr: "Merhaba", ta: "வணக்கம்", it: "Ciao", scn: "Salutamu", ca: "Bon dia",
+  eu: "Kaixo", br: "Demat", co: "Bonghjornu", "gsw-FR": "Salü", nl: "Hoi", pl: "Cześć", uk: "Привіт", ro: "Salut", el: "Γειά σου", sv: "Hej", fi: "Moi", ga: "Dia duit",
+  cy: "Shwmae", "pt-BR": "Oi!", "es-AR": "¿Qué onda?", "es-MX": "¿Qué tal?", ht: "Bonjou", gcf: "Bonjou", qu: "Allillanchu", gn: "Mba'éichapa", ary: "Salam", arq: "Wach rak",
+  aeb: "Aslema", arz: "Ahlan", kab: "Azul", shi: "Azul", wo: "Nanga def", bm: "I ni ce", ln: "Mbote", sw: "Jambo", yo: "Ẹ n lẹ", ig: "Ndewo", am: "ሰላም", so: "Iska warran",
+  mg: "Manao ahoana", zu: "Sawubona", tw: "Akwaaba", fa: "سلام", ps: "سلام", he: "שלום", hy: "Բարեւ", ka: "გამარჯობა", ko: "안녕하세요", yue: "你好", th: "สวัสดี", km: "សួស្តី",
+  tl: "Kumusta", ms: "Selamat", ne: "नमस्ते", mi: "Kia ora", haw: "Aloha", ty: "Ia ora na", yi: "שלום", rcf: "Bonjour zot", mfe: "Bonzour", kea: "Olá", lb: "Moien",
+};
+
 export function themeFor(code: string): Theme {
+  const t = baseTheme(code);
+  const region = languageByCode(code)?.region ?? "Monde";
+  return {
+    ...t,
+    silhouettes: SIL[code] ?? SIL[code.split("-")[0]] ?? REGION_SIL[region] ?? REGION_SIL.Monde,
+    greeting: GREETINGS[code] ?? GREETINGS[code.split("-")[0]],
+  };
+}
+
+export function greetingFor(code: string): string | undefined {
+  return GREETINGS[code];
+}
+
+function baseTheme(code: string): Theme {
   const exact = THEMES[code];
   if (exact) return exact;
   const base = THEMES[code.split("-")[0]];

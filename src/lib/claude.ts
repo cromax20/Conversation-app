@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { KICKOFF } from "./characters";
+import type { Card } from "./cards";
 
 export const CLAUDE_MODEL = process.env.CLAUDE_MODEL || "claude-opus-5-5";
 
@@ -264,4 +265,38 @@ export async function translate(opts: { text: string; direction: "toTarget" | "t
 - note : en ${opts.nativeLang}, une phrase courte sur une expression intéressante de la réplique ; vide si inutile.`,
     TRANSLATION_SCHEMA,
   );
+}
+
+const DECK_SCHEMA = {
+  type: "object", additionalProperties: false, required: ["cards"],
+  properties: {
+    cards: {
+      type: "array",
+      items: {
+        type: "object", additionalProperties: false, required: ["front", "pronunciation", "back", "example"],
+        properties: { front: { type: "string" }, pronunciation: { type: "string" }, back: { type: "string" }, example: { type: "string" } },
+      },
+    },
+  },
+};
+
+/** Paquet de 10 cartes pour un thème et un niveau, pensé pour les conversations et les appels. */
+export async function generateDeck(opts: { languageName: string; level: string; nativeLang: string; topic: string }): Promise<Card[] | { refused: true }> {
+  if (process.env.MOCK_AI === "1") {
+    return Array.from({ length: 10 }, (_, i) => ({ front: `Palabra ${i + 1}`, pronunciation: i === 0 ? "pa-la-bra" : "", back: `Mot ${i + 1}`, example: `Ejemplo ${i + 1}.` }));
+  }
+  const r = await structured<{ cards: Card[] }>(
+    "Tu es professeur·e de langues. Tu crées des cartes de révision utiles pour parler, pas des listes de dictionnaire.",
+    `Langue cible : ${opts.languageName} (telle qu'on la parle au quotidien, y compris s'il s'agit d'un dialecte). Niveau : ${opts.level}. Langue de l'élève : ${opts.nativeLang}.
+Thème : ${opts.topic}.
+
+Crée exactement 10 cartes adaptées au niveau ${opts.level} : des mots, expressions ou petites phrases qu'on utilise vraiment à l'oral, surtout dans une conversation ou un appel avec un·e natif·ve.
+- front : le mot ou l'expression dans la langue cible, dans son écriture habituelle.
+- pronunciation : aide à la prononciation pour un·e locuteur·rice de ${opts.nativeLang} (translittération si l'écriture n'est pas latine) ; vide si inutile.
+- back : la traduction en ${opts.nativeLang}.
+- example : une phrase d'exemple courte dans la langue cible, de niveau ${opts.level}.
+Toutes les traductions (back) doivent être différentes les unes des autres.`,
+    DECK_SCHEMA,
+  );
+  return "refused" in r ? r : r.cards.slice(0, 10);
 }

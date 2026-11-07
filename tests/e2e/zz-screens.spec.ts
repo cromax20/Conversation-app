@@ -5,6 +5,7 @@ import { signIn } from "./helpers";
 test.skip(!process.env.SCREENSHOTS, "captures désactivées");
 test.use({ viewport: { width: 390, height: 844 } });
 
+test.setTimeout(120_000);
 test("captures", async ({ page, context }) => {
   const dir = process.env.SCREENSHOTS!;
   await signIn(context, { pro: true });
@@ -26,10 +27,14 @@ test("captures", async ({ page, context }) => {
   await page.getByRole("button", { name: "Appeler" }).click();
   await page.getByTestId("subtitle").waitFor();
   await page.screenshot({ path: `${dir}/appel.png` });
+  await page.waitForTimeout(15000);
+  await page.screenshot({ path: `${dir}/appel-2.png` });
   await page.getByLabel("Langue du site").selectOption("ar");
   await page.waitForTimeout(800);
   await page.goto("/parcours");
   await page.screenshot({ path: `${dir}/parcours-ar.png`, fullPage: true });
+  await page.goto("/cartes");
+  await page.screenshot({ path: `${dir}/cartes.png`, fullPage: true });
   await page.goto("/abonnement");
   await page.screenshot({ path: `${dir}/abonnement.png`, fullPage: true });
 });

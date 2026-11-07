@@ -34,6 +34,7 @@ model User {
   conversations Conversation[]
   progress      LanguageProgress[]
   usage         UsageEvent[]
+  decks         Deck[]
 }
 
 model Account {
@@ -148,4 +149,35 @@ model UsageEvent {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, createdAt])
+}
+
+// ---- Cartes et quiz ----
+
+model Deck {
+  id           String   @id @default(cuid())
+  userId       String
+  key          String // langue (clé de LanguageProgress)
+  languageName String
+  level        String
+  topic        String
+  cards        Json // [{ front, pronunciation, back, example }]
+  createdAt    DateTime @default(now())
+
+  user    User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reviews CardReview[]
+
+  @@unique([userId, key, level, topic])
+}
+
+model CardReview {
+  id        String   @id @default(cuid())
+  deckId    String
+  index     Int
+  box       Int      @default(1) // boîte de Leitner (1 à 5)
+  due       DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  deck Deck @relation(fields: [deckId], references: [id], onDelete: Cascade)
+
+  @@unique([deckId, index])
 }

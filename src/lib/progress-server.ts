@@ -3,7 +3,11 @@ import { palierInfo, updateStreak, xpForMessage } from "./progress";
 
 /** Ajoute les XP d'un message à la progression de la langue et met à jour la série de jours. */
 export async function awardPractice(userId: string, key: string, text: string) {
-  const xp = xpForMessage(text);
+  return awardXp(userId, key, xpForMessage(text));
+}
+
+/** Ajoute des XP (message, quiz…) à la progression de la langue et met à jour la série de jours. */
+export async function awardXp(userId: string, key: string, xp: number) {
   const user = await prisma.user.findUnique({ where: { id: userId }, select: { streakDays: true, bestStreak: true, lastPracticeDay: true } });
   if (!user) return null;
   const streak = updateStreak(user);

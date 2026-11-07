@@ -1,4 +1,5 @@
 import type { Avatar } from "@/lib/avatar";
+import Silhouette, { type SilhouetteKind } from "./Silhouette";
 
 // Paysages illustrés (SVG) pour le fond des appels et du parcours.
 const SKIES: Record<Avatar["time"], [string, string, string]> = {
@@ -12,13 +13,18 @@ function shade(time: Avatar["time"], day: string, night: string) {
   return time === "night" ? night : day;
 }
 
-export default function Scenery({ scenery, time, className, accent }: { scenery: Avatar["scenery"]; time: Avatar["time"]; className?: string; accent?: string }) {
+type SceneryKind = Exclude<Avatar["scenery"], "country">;
+
+export default function Scenery({ scenery: sceneryIn, time, className, accent, animated = false, silhouette, silhouetteX = 250 }: {
+  scenery: Avatar["scenery"]; time: Avatar["time"]; className?: string; accent?: string; animated?: boolean; silhouette?: SilhouetteKind; silhouetteX?: number;
+}) {
+  const scenery: SceneryKind = sceneryIn === "country" ? "city" : sceneryIn;
   const [top, mid, low] = SKIES[time];
   const id = `sky-${scenery}-${time}`;
   const sunY = time === "sunset" ? 190 : time === "morning" ? 150 : 70;
   const g = (d: string, n: string) => shade(time, d, n);
   return (
-    <svg className={className} viewBox="0 0 400 300" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+    <svg className={`${className ?? ""} ${animated ? "anim" : ""}`} viewBox="0 0 400 300" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
       <defs>
         <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0" stopColor={top} /><stop offset="0.6" stopColor={mid} /><stop offset="1" stopColor={low} />
@@ -28,19 +34,26 @@ export default function Scenery({ scenery, time, className, accent }: { scenery:
       {time === "night" ? (
         <>
           {[[40, 30], [90, 60], [150, 25], [220, 50], [280, 20], [340, 70], [370, 35], [60, 100], [310, 110]].map(([x, y], i) => (
-            <circle key={i} cx={x} cy={y} r={i % 3 ? 1.2 : 1.8} fill="#fff" opacity="0.85" />
+            <circle key={i} className="star" style={{ animationDelay: `${(i * 0.7) % 3}s` }} cx={x} cy={y} r={i % 3 ? 1.2 : 1.8} fill="#fff" opacity="0.85" />
           ))}
           <circle cx="320" cy="60" r="18" fill="#f4f1de" /><circle cx="328" cy="55" r="16" fill={top} />
         </>
       ) : (
-        <circle cx="300" cy={sunY} r={time === "sunset" ? 34 : 24} fill={time === "sunset" ? "#ffb347" : time === "morning" ? "#ffcf7a" : "#fff3b0"} opacity="0.95" />
+        <circle className="sun" cx="300" cy={sunY} r={time === "sunset" ? 34 : 24} fill={time === "sunset" ? "#ffb347" : time === "morning" ? "#ffcf7a" : "#fff3b0"} opacity="0.95" />
       )}
       {time !== "night" && (
         <g fill="#fff" opacity={time === "sunset" ? 0.35 : 0.8}>
-          <ellipse cx="80" cy="60" rx="34" ry="10" /><ellipse cx="105" cy="54" rx="22" ry="10" />
-          <ellipse cx="230" cy="40" rx="28" ry="8" />
+          <g className="cloud c1"><ellipse cx="80" cy="60" rx="34" ry="10" /><ellipse cx="105" cy="54" rx="22" ry="10" /></g>
+          <g className="cloud c2"><ellipse cx="230" cy="40" rx="28" ry="8" /><ellipse cx="248" cy="36" rx="16" ry="7" /></g>
+          <g className="cloud c3"><ellipse cx="-40" cy="80" rx="26" ry="7" /></g>
         </g>
       )}
+      {animated && time !== "night" && (
+        <g className="birds" stroke={time === "sunset" ? "#3a2a40" : "#2b3a55"} strokeWidth="1.6" fill="none" strokeLinecap="round">
+          <path d="M0 0 q4 -4 8 0 q4 -4 8 0" /><path d="M20 10 q3 -3 6 0 q3 -3 6 0" /><path d="M-14 14 q3 -3 6 0 q3 -3 6 0" />
+        </g>
+      )}
+
 
       {scenery === "mountains" && (
         <>
@@ -54,12 +67,14 @@ export default function Scenery({ scenery, time, className, accent }: { scenery:
       {scenery === "sea" && (
         <>
           <path d="M0 195 L400 195 L400 300 L0 300Z" fill={g("#2f7fc0", "#0d2347")} />
-          <path d="M0 205 Q50 200 100 205 T200 205 T300 205 T400 205" stroke="#fff" strokeOpacity="0.5" fill="none" />
-          <path d="M0 225 Q50 220 100 225 T200 225 T300 225 T400 225" stroke="#fff" strokeOpacity="0.35" fill="none" />
+          <g className="waves">
+            <path d="M-100 205 Q-50 200 0 205 T100 205 T200 205 T300 205 T400 205 T500 205" stroke="#fff" strokeOpacity="0.5" fill="none" />
+            <path d="M-100 225 Q-50 220 0 225 T100 225 T200 225 T300 225 T400 225 T500 225" stroke="#fff" strokeOpacity="0.35" fill="none" />
+          </g>
           <path d="M0 255 Q120 235 260 255 T400 250 L400 300 L0 300Z" fill={g("#efd9a7", "#5a5040")} />
           <path d="M40 255 Q48 210 60 190" stroke={g("#6b4a2a", "#2b1e12")} strokeWidth="5" fill="none" />
-          <path d="M60 190 q-24 -2 -36 10 M60 190 q20 -10 36 0 M60 190 q-6 -18 -22 -22 M60 190 q12 -16 28 -14" stroke={g("#2f8a4a", "#173d24")} strokeWidth="6" fill="none" strokeLinecap="round" />
-          <path d="M300 190 l14 -22 l2 22 Z" fill="#fff" opacity="0.9" />
+          <path className="sway" style={{ transformOrigin: "60px 190px" }} d="M60 190 q-24 -2 -36 10 M60 190 q20 -10 36 0 M60 190 q-6 -18 -22 -22 M60 190 q12 -16 28 -14" stroke={g("#2f8a4a", "#173d24")} strokeWidth="6" fill="none" strokeLinecap="round" />
+          <path className="boat" d="M300 190 l14 -22 l2 22 Z" fill="#fff" opacity="0.9" />
         </>
       )}
       {scenery === "desert" && (
@@ -81,7 +96,7 @@ export default function Scenery({ scenery, time, className, accent }: { scenery:
             <rect x="290" y="150" width="45" height="150" /><rect x="340" y="120" width="50" height="180" />
           </g>
           <g fill={time === "night" ? "#ffd36b" : "#cfe3ff"} opacity={time === "night" ? 0.9 : 0.6}>
-            {Array.from({ length: 36 }, (_, i) => <rect key={i} x={16 + (i * 37) % 370} y={150 + ((i * 53) % 120)} width="6" height="8" />)}
+            {Array.from({ length: 36 }, (_, i) => <rect key={i} className={i % 5 === 0 ? "flicker" : undefined} style={{ animationDelay: `${i % 7}s` }} x={16 + (i * 37) % 370} y={150 + ((i * 53) % 120)} width="6" height="8" />)}
           </g>
           <rect x="0" y="270" width="400" height="30" fill={g("#4a5266", "#0e1428")} />
         </>
@@ -104,7 +119,7 @@ export default function Scenery({ scenery, time, className, accent }: { scenery:
           {[[60, 250], [340, 245], [200, 240]].map(([x, y], i) => (
             <g key={i}>
               <path d={`M${x} ${y} Q${x + 6} ${y - 40} ${x + 14} ${y - 70}`} stroke={g("#6b4a2a", "#2b1e12")} strokeWidth="5" fill="none" />
-              <path d={`M${x + 14} ${y - 70} q-26 -2 -38 12 M${x + 14} ${y - 70} q22 -10 38 2 M${x + 14} ${y - 70} q-6 -20 -24 -24 M${x + 14} ${y - 70} q14 -16 30 -12`} stroke={g("#3aa35a", "#18482a")} strokeWidth="7" fill="none" strokeLinecap="round" />
+              <path className="sway" style={{ transformOrigin: `${x + 14}px ${y - 70}px`, animationDelay: `${i * 0.8}s` }} d={`M${x + 14} ${y - 70} q-26 -2 -38 12 M${x + 14} ${y - 70} q22 -10 38 2 M${x + 14} ${y - 70} q-6 -20 -24 -24 M${x + 14} ${y - 70} q14 -16 30 -12`} stroke={g("#3aa35a", "#18482a")} strokeWidth="7" fill="none" strokeLinecap="round" />
             </g>
           ))}
           <circle cx="120" cy="262" r="5" fill="#ff6b8a" /><circle cx="270" cy="258" r="5" fill="#ffb347" />
@@ -117,7 +132,7 @@ export default function Scenery({ scenery, time, className, accent }: { scenery:
           {[[70, 230], [110, 238], [330, 228]].map(([x, y], i) => (
             <path key={i} d={`M${x} ${y} l-14 0 l14 -22 l-10 0 l10 -18 l10 18 l-10 0 l14 22Z`} fill={g("#2f6a4a", "#1a3328")} />
           ))}
-          <g fill="#fff" opacity="0.9">{Array.from({ length: 20 }, (_, i) => <circle key={i} cx={(i * 47) % 400} cy={(i * 29) % 180} r="1.6" />)}</g>
+          <g fill="#fff" opacity="0.9">{Array.from({ length: 28 }, (_, i) => <circle key={i} className="flake" style={{ animationDelay: `${(i * 0.37) % 6}s`, animationDuration: `${6 + (i % 5)}s` }} cx={(i * 47) % 400} cy={(i * 29) % 180} r={1.2 + (i % 3) * 0.5} />)}</g>
         </>
       )}
       {scenery === "village" && (
@@ -133,6 +148,11 @@ export default function Scenery({ scenery, time, className, accent }: { scenery:
           ))}
           <path d="M0 260 Q200 240 400 262 L400 300 L0 300Z" fill={g("#7aa85a", "#1f3a1c")} />
         </>
+      )}
+      {silhouette && (scenery === "city" || scenery === "countryside" || scenery === "village" || scenery === "desert" || scenery === "sea" || scenery === "tropical" || scenery === "mountains" || scenery === "snow") && (
+        <g className="landmark" opacity="0.92">
+          <Silhouette kind={silhouette} x={silhouetteX} scale={0.8} color={time === "night" ? "#0b1026" : time === "sunset" ? "#2a1d33" : "#3a4660"} glow={time === "night" ? "#ffd36b" : undefined} />
+        </g>
       )}
     </svg>
   );

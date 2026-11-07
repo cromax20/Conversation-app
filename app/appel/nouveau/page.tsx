@@ -45,8 +45,9 @@ export default async function NewCallPage({ searchParams }: { searchParams: Prom
       <CallSetup
         progressKey={progress.key}
         languageLabel={label}
+        theme={theme}
         defaults={{
-          avatar: { ...DEFAULT_AVATAR, scenery: theme.scenery, time: theme.time },
+          avatar: { ...DEFAULT_AVATAR, scenery: "country", time: theme.time },
           name: lang?.names[0] ?? "",
           place: lang?.cities[0] ?? "",
         }}

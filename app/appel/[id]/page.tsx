@@ -8,6 +8,7 @@ import { DEFAULT_AVATAR, parseAvatar } from "@/lib/avatar";
 import { getI18n } from "@/i18n/server";
 import { storedLanguageLabel } from "@/i18n";
 import CallRoom from "@/components/CallRoom";
+import { themeFor } from "@/lib/themes";
 
 export default async function CallPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -38,6 +39,7 @@ export default async function CallPage({ params }: { params: Promise<{ id: strin
         languageLabel={storedLanguageLabel(conv.language, conv.languageName, locale)}
         initialMessages={conv.messages.map((m) => ({ id: m.id, role: m.role as "user" | "assistant", text: m.text }))}
         remaining={quota.remaining}
+        theme={themeFor(conv.progressKey.startsWith("custom:") ? "custom" : conv.progressKey)}
       />
       <p className="muted small" style={{ margin: 0, textAlign: "center" }}>{t.chat.remaining(quota.remaining)} · {t.call.illustrated}</p>
     </main>

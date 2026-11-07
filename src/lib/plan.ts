@@ -24,7 +24,7 @@ export async function repliesUsedToday(userId: string, now = new Date()): Promis
   const since = startOfUtcDay(now);
   const [replies, extra] = await Promise.all([
     prisma.message.count({ where: { role: "assistant", createdAt: { gte: since }, conversation: { userId } } }),
-    prisma.usageEvent.count({ where: { userId, createdAt: { gte: since } } }),
+    prisma.usageEvent.count({ where: { userId, kind: "translate", createdAt: { gte: since } } }),
   ]);
   return replies + extra;
 }
