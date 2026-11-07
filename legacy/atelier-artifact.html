@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Atelier de personnages</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Young+Serif&family=Figtree:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: le contexte d'abord (grand bloc), réglages en ligne, puis fiche personnage + chat comme une carte postale */
+:root{
+  color-scheme:light;
+  --paper:#f2f4f7; --card:#ffffff; --ink:#1b2433; --muted:#5a6578;
+  --line:#d6dce6; --accent:#2a4fbf; --accent-soft:#e3e9fb; --stamp:#c8412e; --code:#eef1f6; --on-accent:#ffffff;
+  --display:"Young Serif", Georgia, serif;
+  --body:"Figtree", system-ui, -apple-system, sans-serif;
+  --mono:"JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --paper:#121721; --card:#1a2130; --ink:#e7ecf4; --muted:#9aa6ba;
+  --line:#2c3547; --accent:#7f9cff; --accent-soft:#232f52; --stamp:#ff7a63; --code:#141a26; --on-accent:#0d1220; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --paper:#121721; --card:#1a2130; --ink:#e7ecf4; --muted:#9aa6ba;
+  --line:#2c3547; --accent:#7f9cff; --accent-soft:#232f52; --stamp:#ff7a63; --code:#141a26; --on-accent:#0d1220; color-scheme:dark}
+img{max-width:100%}
+[hidden]{display:none!important}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.55}
+.wrap{max-width:760px;margin:0 auto;padding-block:28px 48px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  display:grid;gap:22px}
+h1{font-family:var(--display);font-weight:400;font-size:clamp(28px,6vw,40px);line-height:1.1;margin:0;text-wrap:balance}
+.lede{color:var(--muted);margin:6px 0 0;max-width:60ch}
+.label{font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+
+/* Contexte : le bloc mis en avant */
+.context{background:var(--accent-soft);border:1.5px solid var(--accent);border-radius:16px;padding:18px;display:grid;gap:12px}
+.context h2{font-family:var(--display);font-weight:400;font-size:22px;margin:0;line-height:1.2}
+.context p{margin:0;color:var(--muted);font-size:14px}
+textarea,input[type=text]{font:16px/1.5 var(--body);color:var(--ink);background:var(--card);border:1px solid var(--line);
+  border-radius:10px;padding:11px 12px;width:100%;box-sizing:border-box}
+textarea{resize:vertical;min-height:72px}
+.chips{display:flex;flex-wrap:wrap;gap:7px}
+.chip{font:500 14px var(--body);color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:999px;padding:6px 12px;cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+
+.controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.controls label{display:grid;gap:4px}
+select{font:500 15px var(--body);color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:8px;padding:9px 10px;min-width:0}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.btn{font:700 16px var(--body);background:var(--accent);color:var(--on-accent);border:0;border-radius:10px;padding:12px 18px;cursor:pointer}
+.btn:hover{filter:brightness(1.08)}
+.btn:disabled{opacity:.5;cursor:default}
+.ghost{font:600 14px var(--body);background:transparent;color:var(--accent);border:1px solid var(--accent);border-radius:8px;padding:7px 14px;cursor:pointer}
+
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px;display:grid;gap:14px;position:relative}
+.stamp{position:absolute;top:16px;right:16px;border:2px solid var(--stamp);color:var(--stamp);border-radius:6px;
+  padding:4px 8px;font:600 12px var(--mono);transform:rotate(4deg);letter-spacing:.04em}
+.who{font-family:var(--display);font-weight:400;font-size:24px;line-height:1.2;margin:0;padding-right:80px}
+.facts{display:flex;flex-wrap:wrap;gap:8px;margin:0;padding:0;list-style:none}
+.facts li{font-size:13px;background:var(--code);border:1px solid var(--line);border-radius:999px;padding:3px 10px}
+.scene{margin:0;color:var(--muted)}
+.scene b{color:var(--ink)}
+
+/* Chat */
+.chat{display:grid;gap:10px;border-top:1px solid var(--line);padding-top:14px}
+.log{display:flex;flex-direction:column;gap:10px;max-height:60vh;overflow-y:auto;padding:2px}
+.msg{max-width:85%;padding:10px 13px;border-radius:14px;white-space:pre-wrap;word-break:break-word;min-width:0}
+.msg.ai{align-self:flex-start;background:var(--code);border:1px solid var(--line);border-bottom-left-radius:4px}
+.msg.me{align-self:flex-end;background:var(--accent);color:var(--on-accent);border-bottom-right-radius:4px}
+.msg.note{align-self:center;background:transparent;color:var(--muted);font-size:13px;text-align:center;max-width:100%}
+.msg .name{display:block;font-size:12px;font-weight:700;color:var(--stamp);margin-bottom:2px}
+.empty{color:var(--muted);text-align:center;margin:8px 0}
+.compose{display:flex;gap:8px;align-items:flex-end}
+.compose textarea{min-height:46px;flex:1;min-width:0}
+.quick{display:flex;gap:6px;flex-wrap:wrap}
+.quick button{font:500 13px var(--body);color:var(--muted);background:transparent;border:1px solid var(--line);border-radius:999px;padding:3px 10px;cursor:pointer}
+details summary{cursor:pointer;color:var(--muted);font-size:14px}
+pre{margin:10px 0 0;background:var(--code);border:1px solid var(--line);border-radius:10px;padding:14px;
+  font:13px/1.6 var(--mono);white-space:pre-wrap;word-break:break-word;overflow-x:auto}
+.row{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+@media (prefers-reduced-motion: reduce){*{scroll-behavior:auto!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Atelier de personnages</h1>
+    <p class="lede">Décrivez une situation, choisissez une langue, et discutez directement avec un personnage qui vous fait pratiquer.</p>
+  </header>
+
+  <section class="context" aria-labelledby="ctxTitle">
+    <h2 id="ctxTitle">Dans quelle situation voulez-vous vous entraîner ?</h2>
+    <p>Écrivez votre propre situation en une phrase, ou choisissez-en une ci-dessous.</p>
+    <label class="label" for="ctx" hidden>Votre contexte</label>
+    <textarea id="ctx" rows="2" placeholder="Ex. : je dois appeler mon propriétaire pour signaler une fuite d'eau"></textarea>
+    <div class="chips" id="chips"></div>
+  </section>
+
+  <div class="controls">
+    <label for="lang"><span class="label">Langue à apprendre</span><select id="lang"></select></label>
+    <label for="level"><span class="label">Niveau</span><select id="level">
+      <option value="A1">A1 · débutant</option><option value="A2" selected>A2 · élémentaire</option>
+      <option value="B1">B1 · intermédiaire</option><option value="B2">B2 · avancé</option><option value="C1">C1 · autonome</option>
+    </select></label>
+    <label for="native"><span class="label">Votre langue</span><select id="native">
+      <option>français</option><option>anglais</option><option>néerlandais</option><option>espagnol</option><option>arabe</option>
+    </select></label>
+  </div>
+
+  <button class="btn" id="go" type="button">Générer un nouveau personnage</button>
+
+  <article class="card">
+    <div class="stamp" id="stamp">A2</div>
+    <h2 class="who" id="who"></h2>
+    <ul class="facts" id="facts"></ul>
+    <p class="scene" id="scene"></p>
+
+    <div class="chat">
+      <div class="row">
+        <span class="label">Conversation</span>
+        <button class="ghost" id="restart" type="button" hidden>Recommencer</button>
+      </div>
+      <div class="log" id="log" aria-live="polite">
+        <p class="empty" id="empty">Appuyez sur « Commencer » : le personnage ouvre la scène.</p>
+      </div>
+      <button class="btn" id="start" type="button">Commencer la conversation</button>
+      <div id="composeWrap" hidden>
+        <div class="compose">
+          <label for="msg" hidden>Votre message</label>
+          <textarea id="msg" rows="1" placeholder="Votre réponse…"></textarea>
+          <button class="btn" id="send" type="button">Envoyer</button>
+        </div>
+        <div class="quick" style="margin-top:8px">
+          <button type="button" data-q="help">help · aide</button>
+          <button type="button" data-q="stop">stop · bilan</button>
+          <button type="button" id="stopGen" hidden>Arrêter</button>
+        </div>
+      </div>
+      <p class="msg note" id="unavail" hidden>Le chat n'est pas disponible ici. Copiez le prompt ci-dessous dans Claude.</p>
+    </div>
+
+    <details>
+      <summary>Voir le prompt (pour l'utiliser ailleurs)</summary>
+      <div class="row" style="margin-top:8px"><span></span><button class="ghost" id="copy" type="button">Copier</button></div>
+      <pre id="prompt"></pre>
+    </details>
+  </article>
+</div>
+
+<script>
+const LANGS = [
+ {fr:"Anglais",n:"English",cities:["Londres","Manchester","New York","Toronto","Sydney","Dublin","Chicago"],names:["Emma","Jack","Olivia","Liam","Grace","Noah","Chloe"]},
+ {fr:"Chinois mandarin",n:"普通话",cities:["Pékin","Shanghai","Chengdu","Taipei","Hangzhou","Xi'an"],names:["Li Wei","Wang Fang","Zhang Min","Chen Jie","Liu Yang","Zhao Lei"]},
+ {fr:"Hindi",n:"हिन्दी",cities:["Delhi","Jaipur","Lucknow","Varanasi","Bhopal","Mumbai"],names:["Priya","Arjun","Ananya","Rohan","Kavita","Vikram"]},
+ {fr:"Espagnol",n:"Español",cities:["Madrid","Séville","Mexico","Buenos Aires","Bogota","Lima"],names:["Lucía","Mateo","Sofía","Diego","Carmen","Javier"]},
+ {fr:"Arabe",n:"العربية",cities:["Le Caire","Casablanca","Beyrouth","Amman","Tunis","Dubaï"],names:["Yasmine","Omar","Layla","Karim","Nour","Samir"]},
+ {fr:"Français",n:"Français",cities:["Lyon","Marseille","Bruxelles","Montréal","Dakar","Genève"],names:["Camille","Lucas","Inès","Hugo","Fatou","Julien"]},
+ {fr:"Bengali",n:"বাংলা",cities:["Dacca","Calcutta","Chittagong","Sylhet","Khulna"],names:["Rina","Arif","Tania","Sabbir","Mitu","Rahim"]},
+ {fr:"Portugais",n:"Português",cities:["Lisbonne","Porto","São Paulo","Rio de Janeiro","Salvador","Luanda"],names:["Beatriz","João","Mariana","Pedro","Ana","Tiago"]},
+ {fr:"Russe",n:"Русский",cities:["Moscou","Saint-Pétersbourg","Kazan","Novossibirsk","Sotchi"],names:["Natalia","Dmitri","Olga","Sergueï","Irina","Pavel"]},
+ {fr:"Indonésien",n:"Bahasa Indonesia",cities:["Jakarta","Bandung","Yogyakarta","Surabaya","Denpasar"],names:["Putri","Budi","Dewi","Agus","Sari","Rizky"]},
+ {fr:"Ourdou",n:"اردو",cities:["Lahore","Karachi","Islamabad","Peshawar","Hyderabad"],names:["Ayesha","Bilal","Sana","Hamza","Zainab","Usman"]},
+ {fr:"Allemand",n:"Deutsch",cities:["Berlin","Munich","Hambourg","Vienne","Zurich","Cologne"],names:["Lena","Jonas","Hannah","Felix","Mia","Lukas"]},
+ {fr:"Japonais",n:"日本語",cities:["Tokyo","Osaka","Kyoto","Fukuoka","Sapporo","Nagoya"],names:["Yuki","Haruto","Aiko","Kenji","Sakura","Takumi"]},
+ {fr:"Pidgin nigérian",n:"Naijá",cities:["Lagos","Port Harcourt","Benin City","Abuja","Warri"],names:["Chioma","Emeka","Blessing","Tunde","Ngozi","Femi"]},
+ {fr:"Marathi",n:"मराठी",cities:["Pune","Mumbai","Nagpur","Nashik","Kolhapur"],names:["Sneha","Aditya","Pooja","Omkar","Rutuja","Sagar"]},
+ {fr:"Vietnamien",n:"Tiếng Việt",cities:["Hanoï","Hô-Chi-Minh-Ville","Da Nang","Hué","Hoi An"],names:["Linh","Minh","Thảo","Tuấn","Hương","Nam"]},
+ {fr:"Télougou",n:"తెలుగు",cities:["Hyderabad","Vijayawada","Visakhapatnam","Tirupati","Warangal"],names:["Lakshmi","Ravi","Divya","Srinivas","Keerthi","Kiran"]},
+ {fr:"Haoussa",n:"Hausa",cities:["Kano","Kaduna","Zaria","Niamey","Sokoto"],names:["Aisha","Musa","Hauwa","Ibrahim","Zainab","Sani"]},
+ {fr:"Turc",n:"Türkçe",cities:["Istanbul","Izmir","Ankara","Antalya","Trabzon"],names:["Elif","Mehmet","Zeynep","Emre","Ayşe","Burak"]},
+ {fr:"Tamoul",n:"தமிழ்",cities:["Chennai","Madurai","Coimbatore","Pondichéry","Jaffna"],names:["Meena","Karthik","Lakshmi","Arun","Divya","Senthil"]}
+];
+const JOBS=["boulanger·ère","chauffeur·se de taxi","infirmier·ère","vendeur·se au marché","étudiant·e en architecture","guide touristique","barista","professeur·e de musique","mécanicien·ne","pharmacien·ne","réceptionniste d'hôtel","fleuriste","cuisinier·ère de rue","libraire","coiffeur·se","agent·e immobilier·ère","retraité·e passionné·e de jardinage","photographe","agriculteur·rice","développeur·se web"];
+const TRAITS=["chaleureux·se et bavard·e","calme et très patient·e","drôle et un peu taquin·e","curieux·se, pose beaucoup de questions","direct·e mais bienveillant·e","enthousiaste, adore partager sa culture","un peu timide au début","nostalgique, aime raconter des souvenirs","pressé·e mais serviable","philosophe, aime les grandes questions"];
+const HOBBIES=["la cuisine familiale","le football","les séries","la randonnée","la musique traditionnelle","les jeux vidéo","la photographie","le cinéma","les voyages","le jardinage","la danse","la lecture"];
+const SCENES=[
+ ["Au marché","l'élève veut acheter des fruits et négocier le prix"],
+ ["Au café","l'élève commande une boisson et engage la conversation"],
+ ["Chez le médecin","l'élève explique ses symptômes"],
+ ["Demander son chemin","l'élève est perdu·e et cherche une adresse"],
+ ["À l'hôtel","l'élève fait son check-in et a un problème avec la chambre"],
+ ["Nouveau voisin","l'élève vient d'emménager et se présente"],
+ ["Entretien d'embauche","l'élève passe un entretien pour un petit emploi"],
+ ["Au restaurant","l'élève commande un repas et pose des questions sur les plats"],
+ ["Dans le taxi","l'élève discute pendant le trajet"],
+ ["À la gare","l'élève achète un billet et se renseigne sur les horaires"],
+ ["Soirée entre amis","l'élève rencontre des gens à une fête"],
+ ["Au téléphone","l'élève appelle pour prendre un rendez-vous"],
+ ["Magasin de vêtements","l'élève cherche une taille et veut échanger un article"],
+ ["Visite touristique","l'élève découvre un lieu célèbre de la ville"],
+ ["Petite discussion","l'élève parle de sa journée, de sa famille et de ses loisirs"],
+ ["À la banque","l'élève veut ouvrir un compte et comprendre les frais"],
+ ["Visite d'appartement","l'élève visite un appartement à louer"],
+ ["Premier jour au travail","l'élève rencontre ses nouveaux collègues"],
+ ["À la pharmacie","l'élève cherche un médicament sans ordonnance"],
+ ["Premier rendez-vous","l'élève discute lors d'un premier rendez-vous"]
+];
+const LEVELS={A1:"phrases très courtes, mots du quotidien, parle lentement",A2:"phrases courtes, vocabulaire courant, présent et passé simple",B1:"phrases naturelles, quelques expressions idiomatiques",B2:"rythme naturel, expressions courantes, humour léger",C1:"langue authentique et nuancée, argot et références culturelles"};
+const ages=[19,23,27,31,34,38,42,47,53,58,64,71];
+const $=id=>document.getElementById(id), pick=a=>a[Math.floor(Math.random()*a.length)];
+
+let sceneSel="r";            // "r" = au hasard, ou index de SCENES ; ignoré si le champ texte est rempli
+let char=null, rules="", turns=[], ctl=null, busy=false, sampleFn=null;
+
+// Contexte
+$("chips").innerHTML=`<button class="chip" type="button" data-s="r" aria-pressed="true">Au hasard</button>`+
+  SCENES.map((s,i)=>`<button class="chip" type="button" data-s="${i}" aria-pressed="false">${s[0]}</button>`).join("");
+function markChips(){document.querySelectorAll(".chip").forEach(c=>c.setAttribute("aria-pressed",String(!$("ctx").value.trim()&&c.dataset.s===sceneSel)))}
+$("chips").addEventListener("click",e=>{const c=e.target.closest(".chip");if(!c)return;$("ctx").value="";sceneSel=c.dataset.s;markChips();generate(false)});
+let t;$("ctx").addEventListener("input",()=>{markChips();clearTimeout(t);t=setTimeout(()=>generate(false),500)});
+
+$("lang").innerHTML=LANGS.map((l,i)=>`<option value="${i}">${l.fr} · ${l.n}</option>`).join("");
+try{const s=localStorage.getItem("lang");if(s)$("lang").value=s}catch(e){}
+
+function newChar(){
+  const L=LANGS[$("lang").value];
+  char={L,name:pick(L.names),age:pick(ages),city:pick(L.cities),job:pick(JOBS),trait:pick(TRAITS),hob:pick(HOBBIES),scene:pick(SCENES)};
+}
+function generate(reroll=true){
+  if(reroll||!char||char.L!==LANGS[$("lang").value]) newChar();
+  const {L,name,age,city,job,trait,hob}=char, lv=$("level").value, nat=$("native").value;
+  const own=$("ctx").value.trim();
+  const sc= own ? ["Votre situation",own] : sceneSel==="r" ? char.scene : SCENES[sceneSel];
+  $("stamp").textContent=lv;
+  $("who").textContent=`${name}, ${age} ans, ${city}`;
+  $("facts").innerHTML=[job,trait,"aime "+hob,L.fr].map(x=>`<li>${x}</li>`).join("");
+  $("scene").innerHTML="";const b=document.createElement("b");b.textContent=sc[0];$("scene").append(b," · "+sc[1]+".");
+  rules=
+`Tu es ${name}, ${age} ans, ${job} à ${city}. Tu es ${trait} et tu adores ${hob}.
+Tu parles uniquement ${L.fr.toLowerCase()} (${L.n}), niveau ${lv} : ${LEVELS[lv]}.
+L'élève parle ${nat} et veut s'entraîner à la conversation.
+Contexte : ${own?own:sc[0].toLowerCase()+" — "+sc[1]}.
+Joue la scène de façon naturelle et réaliste. Si le contexte l'exige, adapte ton rôle (par exemple propriétaire, serveur ou collègue) tout en gardant ta personnalité.
+
+Règles :
+- Commence la scène toi-même avec une première réplique.
+- Réponds en 1 à 3 phrases, comme dans une vraie conversation.
+- Termine chaque réponse par une question pour relancer.
+- Si l'élève fait une erreur, reformule correctement sa phrase dans ta réponse, sans faire de leçon.
+- Si l'écriture n'est pas latine, ajoute la transcription phonétique entre parenthèses.
+- Si l'élève écrit "help", explique brièvement en ${nat}, puis reprends.
+- Si l'élève écrit "stop", sors du personnage et donne en ${nat} : 3 conseils et 5 mots nouveaux avec leur traduction.`;
+  $("prompt").textContent=rules; $("copy").textContent="Copier";
+  try{localStorage.setItem("lang",$("lang").value)}catch(e){}
+  resetChat();
+}
+
+// Chat
+function addMsg(role,text){
+  $("empty").hidden=true;
+  const d=document.createElement("div");d.className="msg "+role;
+  if(role==="ai"){const n=document.createElement("span");n.className="name";n.textContent=char.name;d.append(n)}
+  const body=document.createElement("span");body.textContent=text;d.append(body);
+  $("log").append(d);$("log").scrollTop=$("log").scrollHeight;return body;
+}
+function resetChat(){
+  ctl?.abort();turns=[];busy=false;
+  $("log").querySelectorAll(".msg").forEach(m=>m.remove());$("empty").hidden=false;
+  $("start").hidden=!sampleFn;$("composeWrap").hidden=true;$("restart").hidden=true;$("stopGen").hidden=true;
+}
+const ERR={rate_limited:"Trop de messages d'un coup. Réessayez dans un moment.",session_expired:"Reconnectez-vous à Claude puis réessayez.",refused:"Le personnage n'a pas pu répondre à ce message. Essayez autrement."};
+async function ask(){
+  if(!sampleFn||busy)return;
+  busy=true;$("send").disabled=true;$("stopGen").hidden=false;
+  const bubble=addMsg("ai","…");
+  ctl=new AbortController();
+  const history=turns.slice(-30);
+  const input=[{role:"user",content:rules+"\n\n(Début de la scène. Ouvre la conversation.)"},...history];
+  if(input[input.length-1].role!=="user") input.push({role:"user",content:"(continue)"});
+  try{
+    const {text}=await sampleFn(input,{modelTier:"quick",cache:false,signal:ctl.signal,onText:({text})=>{bubble.textContent=text;$("log").scrollTop=$("log").scrollHeight}});
+    turns.push({role:"assistant",content:text});
+  }catch(e){
+    if(e.code==="not_granted"||e.code==="sampling_disabled"||e.code==="not_declared"||e.code==="capability_disabled"){
+      bubble.parentElement.remove();sampleFn=null;$("start").hidden=true;$("composeWrap").hidden=true;$("unavail").hidden=false;
+    }else if(e.code==="cancelled"){
+      if(e.text){bubble.textContent=e.text;turns.push({role:"assistant",content:e.text})}else bubble.parentElement.remove();
+    }else{
+      if(e.text){bubble.textContent=e.text;turns.push({role:"assistant",content:e.text})}else bubble.parentElement.remove();
+      addMsg("note",ERR[e.code]||"La connexion a été interrompue. Renvoyez votre message.");
+    }
+  }finally{busy=false;$("send").disabled=false;$("stopGen").hidden=true;}
+}
+$("start").addEventListener("click",()=>{$("start").hidden=true;$("composeWrap").hidden=false;$("restart").hidden=false;ask().then(()=>$("msg").focus())});
+function send(text){
+  text=(text??$("msg").value).trim();if(!text||busy)return;
+  addMsg("me",text);turns.push({role:"user",content:text});$("msg").value="";ask();
+}
+$("send").addEventListener("click",()=>send());
+$("msg").addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send()}});
+document.querySelectorAll("[data-q]").forEach(b=>b.addEventListener("click",()=>send(b.dataset.q)));
+$("stopGen").addEventListener("click",()=>ctl?.abort());
+$("restart").addEventListener("click",()=>{resetChat();});
+
+$("go").addEventListener("click",()=>generate(true));
+$("lang").addEventListener("change",()=>generate(true));
+["level","native"].forEach(id=>$(id).addEventListener("change",()=>generate(false)));
+$("copy").addEventListener("click",()=>{
+  const b=$("copy");
+  const sel=()=>{const r=document.createRange();r.selectNodeContents($("prompt"));const s=getSelection();s.removeAllRanges();s.addRange(r);b.textContent="Texte sélectionné";};
+  try{navigator.clipboard.writeText(rules).then(()=>b.textContent="Copié",sel)}catch(e){sel()}
+});
+
+generate(true);
+$("start").hidden=true;
+(async()=>{
+  try{sampleFn=window.claude?await window.claude.use("sample"):null}catch(e){sampleFn=null}
+  if(sampleFn){ if(!turns.length){$("start").hidden=false} } else {$("start").hidden=true;$("unavail").hidden=false;$("empty").hidden=true}
+})();
+</script>
+</body>
+</html>
