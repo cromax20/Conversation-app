@@ -10,7 +10,14 @@ import { currentUser } from "@/lib/session";
 import { welcomeEndsAt, welcomePercent } from "@/lib/growth";
 import RefCapture from "@/components/RefCapture";
 import OfferBar from "@/components/OfferBar";
+import { Figtree, JetBrains_Mono, Young_Serif } from "next/font/google";
+import PauseHidden from "@/components/PauseHidden";
 import "./globals.css";
+
+// Polices hébergées avec le site (pas de requête vers Google à chaque visite), sous-ensembles utiles seulement.
+const display = Young_Serif({ weight: "400", subsets: ["latin", "latin-ext"], variable: "--font-display", display: "swap" });
+const body = Figtree({ subsets: ["latin", "latin-ext"], variable: "--font-body", display: "swap" });
+const mono = JetBrains_Mono({ subsets: ["latin"], weight: ["400", "500"], variable: "--font-mono", display: "swap" });
 
 export async function generateMetadata(): Promise<Metadata> {
   const { t } = await getI18n();
@@ -24,14 +31,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const me = session?.user ? await currentUser() : null;
   const offerEnds = me ? welcomeEndsAt(me) : null;
   return (
-    <html lang={locale} dir={isRtl(locale) ? "rtl" : "ltr"}>
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
-        {/* eslint-disable-next-line @next/next/no-page-custom-font */}
-        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Young+Serif&family=Figtree:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
-      </head>
+    <html lang={locale} dir={isRtl(locale) ? "rtl" : "ltr"} className={`${display.variable} ${body.variable} ${mono.variable}`}>
       <body>
+        <PauseHidden />
         <I18nProvider locale={locale}>
           <RefCapture />
           {offerEnds && <OfferBar endsAt={offerEnds.getTime()} percent={welcomePercent()} />}

@@ -5,7 +5,8 @@ import { features, tierOf } from "@/lib/plan";
 import { freeCallUnlocked } from "@/lib/calls";
 import { voiceAllowed } from "@/lib/calls-server";
 import { TTS_USD_PER_CHAR, budgetBlocks, recordUsage } from "@/lib/costs";
-import { synthesize, voiceEnabled } from "@/lib/voice";
+import { isSlowLevel, resolveVoice, synthesize, voiceEnabled } from "@/lib/voice";
+import { GenerationBlocked, cachedBytes } from "@/lib/ai-cache";
 
 import { jsonError, notFound, unauthorized } from "@/lib/http";
 
@@ -22,7 +23,18 @@ export async function POST(req: Request) {
   if (!parsed.success || (!parsed.data.messageId && !parsed.data.preview)) return jsonError(400, "invalid", "Requête invalide.");
 
   const tier = tierOf(user);
-  if (await budgetBlocks(tier)) return jsonError(503, "budget_paused", "Trop de demande pour le moment. Réessayez plus tard.");
+
+  // Un même texte, avec la même voix, la même langue et le même débit, n'est synthétisé qu'une fois.
+  const speak = async (o: { text: string; characterName: string; languageFr: string; level: string; voice?: string }) => {
+    const voice = resolveVoice(o.characterName, o.voice);
+    return cachedBytes("tts", [voice, o.languageFr, isSlowLevel(o.level), o.text], async () => {
+      if (await budgetBlocks(tier)) throw new GenerationBlocked(503, "budget_paused");
+      const usd = Math.min(4000, o.text.length) * TTS_USD_PER_CHAR;
+      void recordUsage({ userId: user.id, tier, kind: "tts", model: "gpt-4o-mini-tts", usd });
+      return { bytes: await synthesize({ ...o, voice }), costMicros: Math.round(usd * 1e6) };
+    });
+  };
+  const fail = (e: unknown) => e instanceof GenerationBlocked ? jsonError(e.status, e.code, e.code) : jsonError(502, "voice_failed", "La lecture a échoué. Réessayez.");
 
   // Aperçu d'une voix lors de la création d'un interlocuteur.
   if (parsed.data.preview) {
@@ -31,12 +43,11 @@ export async function POST(req: Request) {
       if (!progress.some((p) => freeCallUnlocked(p))) return jsonError(402, "pro_only", "La voix est réservée aux abonnés.");
     }
     try {
-      void recordUsage({ userId: user.id, tier, kind: "tts", model: "gpt-4o-mini-tts", usd: PREVIEW_TEXT.length * TTS_USD_PER_CHAR });
-      const audio = await synthesize({ text: PREVIEW_TEXT, characterName: "", languageFr: parsed.data.preview.language.slice(0, 60), level: "B1", voice: parsed.data.preview.voice });
-      return new Response(audio, { headers: { "Content-Type": "audio/mpeg" } });
+      const { bytes, hit } = await speak({ text: PREVIEW_TEXT, characterName: "", languageFr: parsed.data.preview.language.slice(0, 60), level: "B1", voice: parsed.data.preview.voice });
+      return new Response(bytes, { headers: { "Content-Type": "audio/mpeg", "Cache-Control": "public, max-age=604800", "X-Cache": hit ? "HIT" : "MISS" } });
     } catch (e) {
-      console.error("[voice/preview]", e);
-      return jsonError(502, "voice_failed", "La lecture a échoué. Réessayez.");
+      if (!(e instanceof GenerationBlocked)) console.error("[voice/preview]", e);
+      return fail(e);
     }
   }
 
@@ -49,17 +60,16 @@ export async function POST(req: Request) {
   if (!(await voiceAllowed(user.id, user, msg.conversation))) return jsonError(402, "pro_only", "La voix est réservée aux formules Plus et Premium.");
 
   try {
-    void recordUsage({ userId: user.id, tier, kind: "tts", model: "gpt-4o-mini-tts", usd: Math.min(4000, msg.text.length) * TTS_USD_PER_CHAR });
-    const audio = await synthesize({
+    const { bytes, hit } = await speak({
       text: msg.text,
       characterName: (msg.conversation.character as { name?: string }).name || msg.conversation.id,
       languageFr: msg.conversation.languageName,
       level: msg.conversation.level,
       voice: (msg.conversation.character as { avatar?: { voice?: string } }).avatar?.voice,
     });
-    return new Response(audio, { headers: { "Content-Type": "audio/mpeg", "Cache-Control": "private, max-age=86400" } });
+    return new Response(bytes, { headers: { "Content-Type": "audio/mpeg", "Cache-Control": "private, max-age=604800", "X-Cache": hit ? "HIT" : "MISS" } });
   } catch (e) {
-    console.error("[voice/speak]", e);
-    return jsonError(502, "voice_failed", "La lecture a échoué. Réessayez.");
+    if (!(e instanceof GenerationBlocked)) console.error("[voice/speak]", e);
+    return fail(e);
   }
 }

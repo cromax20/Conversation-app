@@ -22,10 +22,17 @@ function getClient() {
   return client;
 }
 
+/** Voix réellement utilisée (choisie pour l'appel, sinon stable par prénom). */
+export function resolveVoice(characterName: string, voice?: string): (typeof VOICES)[number] {
+  return (voice && (VOICES as readonly string[]).includes(voice) ? voice : voiceFor(characterName)) as (typeof VOICES)[number];
+}
+export const isSlowLevel = (level: string) => level === "A1" || level === "A2";
+
 export const voiceEnabled = () => Boolean(process.env.OPENAI_API_KEY) || process.env.MOCK_AI === "1";
 
 export async function synthesize(opts: { text: string; characterName: string; languageFr: string; level: string; voice?: string }): Promise<ArrayBuffer> {
-  if (process.env.MOCK_AI === "1") return new ArrayBuffer(0);
+  // Tests : un petit fichier factice (jamais d'appel payant).
+  if (process.env.MOCK_AI === "1") return new TextEncoder().encode(`mock-audio:${opts.voice ?? ""}:${opts.text}`).buffer as ArrayBuffer;
   const slow = opts.level === "A1" || opts.level === "A2";
   const res = await getClient().audio.speech.create({
     model: TTS_MODEL,

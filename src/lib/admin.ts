@@ -1,6 +1,7 @@
 import { prisma } from "./db";
 import { PRICES, isPro, tierOf, type PaidTier } from "./plan";
 import { USD_TO_EUR, budgetState, startOfMonth } from "./costs";
+import { cacheSavings } from "./ai-cache";
 
 export function isAdmin(email: string | null | undefined): boolean {
   if (!email) return false;
@@ -41,9 +42,13 @@ export async function dashboard(now = new Date()) {
   const charges = mrr * chargesRate;
   const net = mrr - aiCost - stripeFees - fixed - charges;
   const budget = await budgetState(now);
+  const cache = await cacheSavings();
+  const reused = Object.values(cache.byKind).reduce((a, k) => a + k.hits, 0);
+  const savedEur = cache.savedUsd * USD_TO_EUR;
 
   return {
     byTier, paying, trials, mrr, aiCost, costByTier, stripeFees, fixed, charges, chargesRate, net,
     totalUsers, signups30, active30, conversion: totalUsers ? paying / totalUsers : 0, budget,
+    cache: { byKind: cache.byKind, reused, savedEur },
   };
 }
