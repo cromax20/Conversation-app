@@ -213,3 +213,18 @@ model AiUsage {
 
   @@index([createdAt])
 }
+
+// Réponses de l'IA réutilisables d'un utilisateur à l'autre (paquets de cartes, phrases utiles,
+// traductions, voix). Évite de refaire le même calcul : moins d'énergie, moins de coût.
+model AiCache {
+  key        String   @id // empreinte SHA-256 de la demande normalisée
+  kind       String // deck | phrases | translate | tts
+  value      Json?
+  bytes      Bytes? // audio (voix)
+  costMicros Int      @default(0) // coût de la génération d'origine (µ$), pour mesurer l'économie
+  hits       Int      @default(0)
+  createdAt  DateTime @default(now())
+  lastUsedAt DateTime @default(now())
+
+  @@index([kind, lastUsedAt])
+}

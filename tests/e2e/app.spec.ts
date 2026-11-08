@@ -550,3 +550,60 @@ test("relances : série en danger envoyée une fois par jour, désinscription en
   expect((await request.get(`/api/email/unsubscribe?u=${u.id}&s=${s}`)).status()).toBe(200);
   expect((await db.user.findUniqueOrThrow({ where: { id: u.id } })).emailOptOut).toBe(true);
 });
+
+test("éco : un paquet, une traduction et une voix déjà produits sont réutilisés, sans compter dans les limites", async ({ page, context, browser }) => {
+  await db.aiCache.deleteMany({});
+  // 1er élève : le paquet « Nourriture » en italien A2 est généré.
+  const a = await signIn(context);
+  await db.languageProgress.create({ data: { userId: a.id, key: "it", languageName: "Italien", level: "A2", startLevel: "A2" } });
+  await page.goto("/");
+  const first = await page.request.post("/api/decks", { data: { key: "it", topic: "food" } });
+  expect(first.status()).toBe(201);
+  expect((await first.json()).cached).toBe(false);
+
+  // 2e élève : même langue, niveau et thème → paquet réutilisé, et il peut encore créer un paquet aujourd'hui.
+  const ctx2 = await browser.newContext({ locale: "fr-FR" });
+  const b = await signIn(ctx2);
+  await db.languageProgress.create({ data: { userId: b.id, key: "it", languageName: "Italien", level: "A2", startLevel: "A2" } });
+  const p2 = await ctx2.newPage();
+  await p2.goto("/");
+  const reused = await p2.request.post("/api/decks", { data: { key: "it", topic: "food" } });
+  expect((await reused.json()).cached).toBe(true);
+  expect((await p2.request.post("/api/decks", { data: { key: "it", topic: "travel" } })).status()).toBe(201); // limite gratuite (1) intacte
+  await ctx2.close();
+
+  // Traduction : la même phrase n'est traduite qu'une fois et ne consomme pas de réponse.
+  const conv = await db.conversation.create({ data: { userId: a.id, title: "t", language: "it", languageName: "Italien", progressKey: "it", level: "A2", nativeLang: "français", scene: "free", context: "", character: { name: "Giulia", age: 30, city: "", job: "barista", trait: "calme et très patient·e", hobby: "le football" }, systemPrompt: "x" } });
+  const t1 = await (await page.request.post(`/api/conversations/${conv.id}/translate`, { data: { text: "Je voudrais un café", direction: "toTarget" } })).json();
+  const t2 = await (await page.request.post(`/api/conversations/${conv.id}/translate`, { data: { text: "  je voudrais un CAFÉ ", direction: "toTarget" } })).json();
+  expect(t1.cached).toBe(false);
+  expect(t2.cached).toBe(true);
+  expect(t2.remaining).toBe(t1.remaining);
+
+  const row = await db.aiCache.findFirstOrThrow({ where: { kind: "deck" } });
+  expect(row.hits).toBeGreaterThanOrEqual(1);
+});
+
+test("éco : la voix d'aperçu n'est synthétisée qu'une fois pour tout le monde", async ({ page, context }) => {
+  await db.aiCache.deleteMany({ where: { kind: "tts" } });
+  await signIn(context, { plan: "plus" });
+  await page.goto("/");
+  const ask = () => page.request.post("/api/voice/speak", { data: { preview: { voice: "coral", language: "Italien" } } });
+  const r1 = await ask();
+  expect(r1.status()).toBe(200);
+  expect(r1.headers()["x-cache"]).toBe("MISS");
+  const r2 = await ask();
+  expect(r2.headers()["x-cache"]).toBe("HIT");
+  expect(Buffer.from(await r2.body()).equals(Buffer.from(await r1.body()))).toBe(true);
+});
+
+test("éco : le tableau de bord affiche les appels évités, le ménage quotidien tourne", async ({ page, context, request }) => {
+  await db.user.deleteMany({ where: { email: "admin@exemple.test" } });
+  await signIn(context, { email: "admin@exemple.test" });
+  await page.goto("/admin");
+  await expect(page.getByTestId("eco")).toContainText("Appels évités");
+  const old = await db.usageEvent.create({ data: { userId: (await db.user.findFirstOrThrow({ where: { email: "admin@exemple.test" } })).id, kind: "card", createdAt: new Date(Date.now() - 90 * 86_400_000) } });
+  const r = await request.get("/api/cron/daily", { headers: { authorization: "Bearer cron_e2e" } });
+  expect((await r.json()).cleaned.usageEvents).toBeGreaterThanOrEqual(1);
+  expect(await db.usageEvent.findUnique({ where: { id: old.id } })).toBeNull();
+});

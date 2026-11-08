@@ -36,6 +36,20 @@ export default async function AdminPage() {
         </section>
       )}
 
+      <section className="card" data-testid="eco">
+        <h2 style={{ margin: 0 }}>🌱 Réponses réutilisées</h2>
+        <p className="muted small" style={{ margin: 0 }}>Chaque réutilisation évite un nouvel appel à l'IA : moins d'énergie consommée et moins de frais.</p>
+        <table className="table">
+          <thead><tr><th>Type</th><th>Réponses gardées</th><th>Appels évités</th></tr></thead>
+          <tbody>
+            {([["deck", "Paquets de cartes"], ["phrases", "Phrases pour commencer"], ["translate", "Traductions"], ["tts", "Voix"]] as const).map(([k, label]) => (
+              <tr key={k}><td>{label}</td><td>{d.cache.byKind[k]?.entries ?? 0}</td><td>{d.cache.byKind[k]?.hits ?? 0}</td></tr>
+            ))}
+            <tr><td><b>Total</b></td><td /><td><b>{d.cache.reused}</b> · ≈ {eur(d.cache.savedEur)} économisés</td></tr>
+          </tbody>
+        </table>
+      </section>
+
       <section className="card">
         <h2 style={{ margin: 0 }}>Abonnés par formule</h2>
         <table className="table">

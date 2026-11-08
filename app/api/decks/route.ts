@@ -7,6 +7,9 @@ import { TOPICS, isTopic } from "@/lib/cards";
 import { cardsUsage, over } from "@/lib/cards-server";
 import { budgetBlocks, recordUsage } from "@/lib/costs";
 import { tierOf } from "@/lib/plan";
+import { GenerationBlocked, cachedJson } from "@/lib/ai-cache";
+import { tokenCostUsd } from "@/lib/costs";
+import type { Card } from "@/lib/cards";
 
 export const maxDuration = 60;
 
@@ -22,23 +25,27 @@ export async function POST(req: Request) {
   const existing = await prisma.deck.findUnique({ where: { userId_key_level_topic: { userId: user.id, key, level: progress.level, topic } } });
   if (existing) return Response.json({ id: existing.id, cards: existing.cards });
 
-  const usage = await cardsUsage(user.id, user);
-  if (over(usage, "decks")) return jsonError(429, "decks_limit", "Limite de paquets atteinte.");
-
   const tier = tierOf(user);
-  if (await budgetBlocks(tier)) return jsonError(503, "budget_paused", "Trop de demande pour le moment. Réessayez plus tard.");
-
   const last = await prisma.conversation.findFirst({ where: { userId: user.id, progressKey: key }, orderBy: { updatedAt: "desc" }, select: { nativeLang: true } });
+  const nativeLang = last?.nativeLang ?? "français";
   try {
-    const cards = await generateDeck({ languageName: progress.languageName, level: progress.level, nativeLang: last?.nativeLang ?? "français", topic: TOPICS.find((x) => x.id === topic)!.fr,
-      onUsage: (model, usage) => void recordUsage({ userId: user.id, tier, kind: "deck", model, usage }) });
-    if ("refused" in cards) return jsonError(422, "refused", "Refusé.");
-    const [deck] = await prisma.$transaction([
-      prisma.deck.create({ data: { userId: user.id, key, languageName: progress.languageName, level: progress.level, topic, cards } }),
-      prisma.usageEvent.create({ data: { userId: user.id, kind: "deck" } }),
-    ]);
-    return Response.json({ id: deck.id, cards }, { status: 201 });
+    // Même langue, niveau, thème et langue de l'élève : le paquet est partagé, pas régénéré.
+    const r = await cachedJson<Card[]>("deck", [key, progress.level, topic, nativeLang], async () => {
+      const usage = await cardsUsage(user.id, user);
+      if (over(usage, "decks")) throw new GenerationBlocked(429, "decks_limit");
+      if (await budgetBlocks(tier)) throw new GenerationBlocked(503, "budget_paused");
+      let cost = 0;
+      const cards = await generateDeck({ languageName: progress.languageName, level: progress.level, nativeLang, topic: TOPICS.find((x) => x.id === topic)!.fr,
+        onUsage: (model, u) => { cost = Math.round(tokenCostUsd(model, u) * 1e6); void recordUsage({ userId: user.id, tier, kind: "deck", model, usage: u }); } });
+      if ("refused" in cards) throw new GenerationBlocked(422, "refused");
+      await prisma.usageEvent.create({ data: { userId: user.id, kind: "deck" } });
+      return { value: cards, costMicros: cost };
+    });
+    const cards = r!.value;
+    const deck = await prisma.deck.create({ data: { userId: user.id, key, languageName: progress.languageName, level: progress.level, topic, cards } });
+    return Response.json({ id: deck.id, cards, cached: r!.hit }, { status: 201 });
   } catch (e) {
+    if (e instanceof GenerationBlocked) return jsonError(e.status, e.code, e.code);
     console.error("[decks]", e instanceof ReplyError ? e.code : e);
     return jsonError(502, e instanceof ReplyError ? e.code : "reply_failed", "Échec.");
   }

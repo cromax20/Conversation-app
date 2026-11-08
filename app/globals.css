@@ -2,9 +2,9 @@
   color-scheme:light;
   --paper:#f2f4f7; --card:#ffffff; --ink:#1b2433; --muted:#5a6578;
   --line:#d6dce6; --accent:#2a4fbf; --accent-soft:#e3e9fb; --stamp:#c8412e; --code:#eef1f6; --on-accent:#ffffff;
-  --ok:#1f7a4d; --display:"Young Serif", Georgia, serif;
-  --body:"Figtree", system-ui, -apple-system, sans-serif;
-  --mono:"JetBrains Mono", ui-monospace, Menlo, monospace;
+  --ok:#1f7a4d; --display:var(--font-display), Georgia, serif;
+  --body:var(--font-body), system-ui, -apple-system, sans-serif;
+  --mono:var(--font-mono), ui-monospace, Menlo, monospace;
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
   --paper:#121721; --card:#1a2130; --ink:#e7ecf4; --muted:#9aa6ba;
@@ -403,3 +403,7 @@ body{background:
 .upgrade{align-self:stretch;display:flex;gap:12px;align-items:flex-start;padding:14px;border-radius:16px;border:1px solid transparent;
   background:linear-gradient(var(--card),var(--card)) padding-box,linear-gradient(135deg,#4b2bd8,#ff5f8f) border-box}
 .upgrade-icon{font-size:28px}
+
+/* ---- Sobriété ---- */
+html[data-hidden] *,html[data-hidden] *::before,html[data-hidden] *::after{animation-play-state:paused!important}
+@media (prefers-reduced-data: reduce){.anim *,.kenburns,.hero,.float{animation:none!important}}
